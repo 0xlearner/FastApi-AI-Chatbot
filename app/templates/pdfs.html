@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold mb-4">Your PDFs</h1>
+        
+        <!-- Upload Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <form id="upload-form" class="space-y-4">
+                <div class="flex items-center space-x-4">
+                    <input type="file" 
+                           id="pdf-file" 
+                           accept=".pdf"
+                           class="block w-full text-sm text-gray-500
+                                  file:mr-4 file:py-2 file:px-4
+                                  file:rounded-full file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-indigo-50 file:text-indigo-700
+                                  hover:file:bg-indigo-100"
+                    >
+                    <button type="submit"
+                            id="upload-button"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        Upload
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Progress Bar (hidden by default) -->
+            <div id="progress-container" class="mt-4 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="progress-status" class="text-sm text-gray-600">Processing...</span>
+                    <span id="progress-percentage" class="text-sm font-medium text-indigo-600">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" 
+                         class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                         style="width: 0%">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PDFs List -->
+        <div id="pdf-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- PDFs will be listed here -->
+        </div>
+    </div>
+</div>
+
+<script>
+let websocket = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY = 1000; // 1 second
+let uploadInProgress = false;
+
+function getAuthToken() {
+    // Try localStorage first
+    const token = localStorage.getItem('access_token');
+    if (token) {
+        console.log('Found token in localStorage');
+        return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    }
+    
+    // Try cookies as fallback
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'access_token') {
+            console.log('Found token in cookies');
+            const token = value.trim();
+            return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        }
+    }
+    console.log('No token found');
+    return null;
+}
+
+function clearAuth() {
+    console.log('Clearing authentication...');
+    localStorage.removeItem('access_token');
+    document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    window.location.href = '/login';
+}
+
+// Add these helper functions for token management
+function saveAuthToken(token) {
+    // Save to both localStorage and cookie for redundancy
+    localStorage.setItem('access_token', token);
+    const date = new Date();
+    date.setTime(date.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days
+    document.cookie = `access_token=${token}; expires=${date.toUTCString()}; path=/`;
+}
+
+function checkAuthAndRedirect() {
+    const token = getAuthToken();
+    if (!token) {
+        console.log('No auth token found, redirecting to login...');
+        window.location.href = '/login';
+        return false;
+    }
+    return true;
+}
+
+function showProgress(show = true) {
+    const container = document.getElementById('progress-container');
+    container.classList.toggle('hidden', !show);
+    
+    // Update button state
+    const uploadButton = document.getElementById('upload-button');
+    uploadButton.disabled = show;
+    uploadButton.classList.toggle('opacity-50', show);
+    uploadButton.classList.toggle('cursor-not-allowed', show);
+}
+
+function connectWebSocket(fileId) {
+    if (websocket) {
+        console.log('Closing existing WebSocket connection');
+        websocket.close();
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/v1/pdf/progress/${fileId}`;
+    
+    console.log(`[${new Date().toISOString()}] Connecting to WebSocket:`, wsUrl);
+    
+    websocket = new WebSocket(wsUrl);
+    
+    websocket.onopen = function(event) {
+        console.log(`[${new Date().toISOString()}] WebSocket connection established`);
+        reconnectAttempts = 0;
+        uploadInProgress = true;
+        
+        // Send initial message to confirm connection
+        try {
+            websocket.send(JSON.stringify({ type: 'connect', fileId: fileId }));
+        } catch (error) {
+            console.error('Error sending initial message:', error);
+        }
+    };
+    
+    websocket.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            console.log(`[${new Date().toISOString()}] Received WebSocket message:`, data);
+            
+            if (data.progress !== undefined) {
+                console.log(`Updating progress to ${data.progress}% - ${data.status}`);
+                updateProgress(data.progress, data.status);
+                
+                if (data.progress === 100) {
+                    console.log('Processing complete, preparing to redirect...');
+                    uploadInProgress = false;
+                    setTimeout(() => {
+                        console.log(`Redirecting to: ${data.redirect}`);
+                        window.location.href = data.redirect;
+                    }, 1000);
+                }
+            }
+            
+            if (data.error) {
+                console.error('Processing error:', data.error);
+                alert(`Error processing PDF: ${data.error}`);
+                uploadInProgress = false;
+                showProgress(false);
+            }
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error, event.data);
+        }
+    };
+    
+    websocket.onerror = function(event) {
+        console.error(`[${new Date().toISOString()}] WebSocket error:`, event);
+        handleWebSocketError();
+    };
+    
+    websocket.onclose = function(event) {
+        console.log(`[${new Date().toISOString()}] WebSocket closed:`, event);
+        if (uploadInProgress) {
+            handleWebSocketClose();
+        }
+    };
+}
+
+function updateProgress(progress, status) {
+    console.log(`[${new Date().toISOString()}] Updating progress: ${progress}%, Status: ${status}`);
+    
+    requestAnimationFrame(() => {
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const progressStatus = document.getElementById('progress-status');
+        
+        if (progress !== null && !isNaN(progress)) {
+            progressBar.style.width = `${progress}%`;
+            progressPercentage.textContent = `${progress}%`;
+        }
+        
+        if (status) {
+            progressStatus.textContent = status;
+        }
+        
+        // Log the actual DOM updates
+        console.log('DOM updated:', {
+            width: progressBar.style.width,
+            percentage: progressPercentage.textContent,
+            status: progressStatus.textContent
+        });
+    });
+}
+
+function handleWebSocketError() {
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        console.log(`Attempting to reconnect (${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`);
+        setTimeout(() => {
+            reconnectAttempts++;
+            connectWebSocket(currentFileId);
+        }, RECONNECT_DELAY * reconnectAttempts);
+    } else {
+        console.error('WebSocket connection failed after multiple attempts');
+        updateProgress(null, 'Connection lost. Processing continues in background...');
+    }
+}
+
+function handleWebSocketClose() {
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        console.log(`WebSocket closed, attempting to reconnect (${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`);
+        setTimeout(() => {
+            reconnectAttempts++;
+            connectWebSocket(currentFileId);
+        }, RECONNECT_DELAY * reconnectAttempts);
+    }
+}
+
+let currentFileId = null;
+
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (uploadInProgress) {
+        alert('Upload already in progress');
+        return;
+    }
+    
+    const fileInput = document.getElementById('pdf-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a PDF file');
+        return;
+    }
+    
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert('Only PDF files are allowed');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        showProgress(true);
+        updateProgress(0, 'Starting upload...');
+        
+        const token = getAuthToken();
+        if (!token) {
+            console.error('No auth token found');
+            clearAuth();
+            return;
+        }
+        
+        const response = await fetch('/api/v1/pdf/upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': token
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+        
+        const data = await response.json();
+        console.log('Upload response:', data);
+        
+        currentFileId = data.file_id;
+        connectWebSocket(data.file_id);
+        
+        // Update progress to indicate successful upload
+        updateProgress(5, 'File uploaded, starting processing...');
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        alert(error.message || 'Error uploading file');
+        uploadInProgress = false;
+        showProgress(false);
+    }
+});
+
+// ... rest of the code (getAuthToken, clearAuth, loadPDFs) remains the same ...
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', (event) => {
+    if (uploadInProgress) {
+        event.preventDefault();
+        event.returnValue = 'Upload in progress. Are you sure you want to leave?';
+    }
+    if (websocket) {
+        websocket.close();
+    }
+});
+</script>
+{% endblock %}

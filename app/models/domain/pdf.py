@@ -1,18 +1,19 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
-from app.models.domain.user import Base
 from datetime import datetime
-import uuid
+from app.core.database import Base
 
 
 class PDF(Base):
     __tablename__ = "pdfs"
 
     id = Column(Integer, primary_key=True, index=True)
-    file_id = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    file_id = Column(String, unique=True, index=True)
     filename = Column(String)
     file_path = Column(String)
     user_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_processed = Column(Boolean, default=False)
 
+    # Use string references for relationships
     user = relationship("User", back_populates="pdfs")

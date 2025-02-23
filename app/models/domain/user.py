@@ -1,9 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
-
-Base = declarative_base()
+from app.core.database import Base
 
 
 class User(Base):
@@ -13,4 +11,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Use string references for relationships to avoid circular imports
     pdfs = relationship("PDF", back_populates="user")
+    messages = relationship("Message", back_populates="user")

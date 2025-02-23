@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     # Database configurations
     DATABASE_URL: str = "sqlite:///./sql_app.db"
+    DROP_DB_ON_STARTUP: bool = True
 
     # Pinecone configurations
     PINECONE_API_KEY: str

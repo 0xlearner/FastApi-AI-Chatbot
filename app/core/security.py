@@ -1,11 +1,26 @@
 from datetime import datetime, timedelta
 from typing import Optional
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+import logging
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.domain.user import User as UserModel
+from app.schemas.user import TokenData
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+logger = logging.getLogger(__name__)
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -15,14 +30,75 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+        to_encode, 
+        settings.SECRET_KEY, 
+        algorithm=settings.ALGORITHM
     )
     return encoded_jwt
 
+def extract_token_from_request(request: Request) -> Optional[str]:
+    logger.debug(f"Headers: {request.headers}")
+    logger.debug(f"Cookies: {request.cookies}")
+    
+    # Try getting token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    logger.debug(f"Auth header: {auth_header}")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    
+    # Try getting token from cookie
+    cookie_token = request.cookies.get("access_token")
+    logger.debug(f"Cookie token: {cookie_token}")
+    if cookie_token:
+        if cookie_token.startswith("Bearer "):
+            return cookie_token[7:]
+        return cookie_token
+    
+    return None
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+async def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> UserModel:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
+    try:
+        token = extract_token_from_request(request)
+        logger.debug(f"Extracted token: {token}")
 
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+        if not token:
+            logger.error("No token found in request")
+            raise credentials_exception
+
+        try:
+            payload = jwt.decode(
+                token,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM]
+            )
+            email: str = payload.get("sub")
+            if email is None:
+                logger.error("No email in token payload")
+                raise credentials_exception
+            
+            logger.debug(f"Token payload: {payload}")
+            token_data = TokenData(email=email)
+        except JWTError as e:
+            logger.error(f"JWT decode error: {str(e)}")
+            raise credentials_exception
+
+        user = db.query(UserModel).filter(UserModel.email == token_data.email).first()
+        if user is None:
+            logger.error(f"No user found for email: {token_data.email}")
+            raise credentials_exception
+
+        logger.debug(f"Successfully authenticated user: {user.email}")
+        return user
+        
+    except Exception as e:
+        logger.error(f"Authentication error: {str(e)}")
+        raise credentials_exception

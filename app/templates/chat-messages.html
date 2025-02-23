@@ -1,12 +1,13 @@
-{% macro chat_message(message) %}
+{% for message in messages %}
 <div class="flex justify-{{ 'end' if message.role == 'user' else 'start' }} message-in">
     <div
         class="max-w-[70%] {{ 'bg-indigo-600 text-white' if message.role == 'user' else 'bg-white' }} rounded-lg px-4 py-2 shadow">
         <p class="text-sm">{{ message.content }}</p>
         {% if message.role == 'assistant' and message.sources %}
+        {% set sources = message.sources|fromjson %}
         <div class="mt-2 text-xs {{ 'text-gray-500' if message.role == 'assistant' else 'text-gray-200' }}">
             <p>Sources:</p>
-            {% for source in message.sources %}
+            {% for source in sources %}
             <div class="mt-1">
                 <p class="font-medium">Page {{ source.page_number }}:</p>
                 <p class="italic">{{ source.text_preview }}</p>
@@ -16,4 +17,4 @@
         {% endif %}
     </div>
 </div>
-{% endmacro %}
+{% endfor %}

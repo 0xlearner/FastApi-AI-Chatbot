@@ -1,0 +1,30 @@
+{% macro pdf_card(pdf) %}
+<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-4" id="pdf-{{ pdf.file_id }}">
+    <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+        <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                {{ pdf.filename }}
+            </h3>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                Uploaded on {{ pdf.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+            </p>
+            <p class="mt-1 text-sm text-gray-500 status">
+                {% if pdf.is_processed %}Processed{% else %}Pending processing{% endif %}
+            </p>
+        </div>
+        <div class="flex space-x-2">
+            {% if not pdf.is_processed %}
+            <button id="process-{{ pdf.file_id }}"
+                    onclick="startProcessing('{{ pdf.file_id }}')"
+                    class="bg-green-100 text-green-700 px-4 py-2 rounded-md hover:bg-green-200">
+                Process
+            </button>
+            {% endif %}
+            <a href="/chat/{{ pdf.file_id }}" 
+               class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md hover:bg-indigo-200 chat-button {% if not pdf.is_processed %}hidden{% endif %}">
+                Chat
+            </a>
+        </div>
+    </div>
+</div>
+{% endmacro %}

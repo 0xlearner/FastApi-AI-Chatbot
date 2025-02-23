@@ -1,8 +1,6 @@
 import logging
-import sys
 import os
 from logging.handlers import RotatingFileHandler
-from app.core.config import settings
 
 # Create logs directory if it doesn't exist
 LOGS_DIR = "logs"
@@ -20,50 +18,50 @@ DEBUG_FORMAT = (
 
 
 def setup_logging():
-    # Create formatters
-    console_formatter = logging.Formatter(CONSOLE_FORMAT)
-    file_formatter = logging.Formatter(FILE_FORMAT)
-    debug_formatter = logging.Formatter(DEBUG_FORMAT)
+    # Create logs directory if it doesn't exist
+    logs_dir = "logs"
+    os.makedirs(logs_dir, exist_ok=True)
 
-    # Create handlers
-    # Console handler - INFO level
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(console_formatter)
-    console_handler.setLevel(logging.INFO)
+    # Configure formatters
+    detailed_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
-    # Main log file handler - INFO level
+    # Configure handlers
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(detailed_formatter)
+
+    # Main log file
+    main_log_file = os.path.join(logs_dir, "app.log")
     file_handler = RotatingFileHandler(
-        os.path.join(LOGS_DIR, "app.log"), maxBytes=10485760, backupCount=5  # 10MB
+        main_log_file,
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
     )
-    file_handler.setFormatter(file_formatter)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(detailed_formatter)
 
-    # Debug log file handler - DEBUG level
+    # Debug log file
+    debug_log_file = os.path.join(logs_dir, "debug.log")
     debug_handler = RotatingFileHandler(
-        os.path.join(LOGS_DIR, "debug.log"), maxBytes=10485760, backupCount=5  # 10MB
+        debug_log_file,
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
     )
-    debug_handler.setFormatter(debug_formatter)
-    debug_handler.setLevel(logging.DEBUG)
+    debug_handler.setFormatter(detailed_formatter)
 
-    # Set up root logger
+    # Configure root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all levels
+    root_logger.setLevel(logging.INFO)
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
-    root_logger.addHandler(debug_handler)
 
-    # Set up specific loggers
+    # Configure specific loggers
     loggers = {
         "app": {"level": logging.DEBUG, "handlers": ["console", "file", "debug"]},
         "app.api": {"level": logging.DEBUG, "handlers": ["console", "file", "debug"]},
-        "app.services": {
-            "level": logging.DEBUG,
-            "handlers": ["console", "file", "debug"],
-        },
-        "app.services.rag_pipeline": {
-            "level": logging.DEBUG,
-            "handlers": ["console", "file", "debug"],
-        },
+        "app.services": {"level": logging.DEBUG, "handlers": ["console", "file", "debug"]},
+        "app.services.pdf_service": {"level": logging.DEBUG, "handlers": ["console", "file", "debug"]},
+        "app.services.rag_pipeline": {"level": logging.DEBUG, "handlers": ["console", "file", "debug"]},
         "uvicorn": {"level": logging.INFO, "handlers": ["console", "file"]},
         "fastapi": {"level": logging.INFO, "handlers": ["console", "file"]},
     }
@@ -79,18 +77,16 @@ def setup_logging():
     for logger_name, config in loggers.items():
         logger = logging.getLogger(logger_name)
         logger.setLevel(config["level"])
-
+        
         # Remove any existing handlers
         logger.handlers = []
-
+        
         # Add configured handlers
         for handler_name in config["handlers"]:
             logger.addHandler(handlers[handler_name])
 
-        # Prevent propagation to root logger if we're handling it specifically
+        # Prevent propagation to root logger
         logger.propagate = False
-
-    return loggers
 
 
 def get_logger(name: str) -> logging.Logger:
