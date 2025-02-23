@@ -11,7 +11,9 @@ from tenacity import (
     retry_if_exception_type,
 )
 
-logger = logging.getLogger(__name__)
+from app.utils.logging import get_pipeline_logger
+
+logger = get_pipeline_logger("llm")
 
 
 class OllamaLLM:

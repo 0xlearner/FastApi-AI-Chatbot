@@ -6,8 +6,9 @@ from app.initialize import initialize_application
 from app.core.logging_config import setup_logging
 
 # Setup logging
-loggers = setup_logging()
-logger = loggers["app"]
+from app.utils.logging import get_api_logger
+
+logger = get_api_logger("Main")
 
 app = FastAPI(
     title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json"

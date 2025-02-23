@@ -5,7 +5,9 @@ import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from app.utils.logging import get_pipeline_logger
+
+logger = get_pipeline_logger("embeddings")
 
 
 class OllamaEmbeddings:

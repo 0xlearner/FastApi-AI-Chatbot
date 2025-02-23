@@ -1,9 +1,13 @@
 from pinecone import Pinecone, Index
 from typing import List, Dict, Any, Optional
 import logging
-from .text_processor import TextProcessor
+import numpy as np
+from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from app.services.rag_pipeline.text_processor import TextProcessor
+from app.utils.logging import get_pipeline_logger
+
+logger = get_pipeline_logger("vector_store")
 
 
 class PineconeStore:
@@ -11,6 +15,7 @@ class PineconeStore:
         pc = Pinecone(api_key=api_key)
         self.index = pc.Index(index_name)
         self.text_processor = TextProcessor()
+        logger.info(f"Initialized PineconeStore with index: {index_name}")
 
     async def upsert_documents(
         self, embeddings: List[List[float]], documents: List[Dict]
@@ -57,53 +62,93 @@ class PineconeStore:
         query_embedding: List[float],
         top_k: int = 5,
         metadata_filter: Optional[Dict[str, Any]] = None,
-        score_threshold: float = 0.15,  # Lowered threshold to get more results
+        score_threshold: float = 0.2,
+        min_score_cutoff: float = 0.3,  # Added minimum score threshold
     ) -> List[Dict]:
-        """Perform similarity search with improved filtering and scoring"""
+        """
+        Perform similarity search with improved filtering and scoring
+        """
         try:
-            logger.info(f"Searching with filter: {metadata_filter}")
+            start_time = datetime.utcnow()
+            logger.info(
+                f"[{start_time}] Starting similarity search with filter: {metadata_filter}"
+            )
 
-            # Query Pinecone with higher top_k for post-processing
+            # Query Pinecone
             results = self.index.query(
                 vector=query_embedding,
-                top_k=top_k * 3,  # Get more results for post-processing
+                top_k=top_k * 2,  # Get more results for filtering
                 include_metadata=True,
+                include_values=True,
                 filter=metadata_filter,
             )
 
+            logger.info(f"Got {len(results.matches)} initial matches from Pinecone")
+
+            # Find the highest score
+            if results.matches:
+                max_score = max(match.score for match in results.matches)
+                logger.info(f"Highest similarity score: {max_score:.4f}")
+            else:
+                logger.warning("No matches found")
+                return []
+
+            # Only keep results close to the highest score
+            score_cutoff = max(
+                min_score_cutoff, max_score * 0.8
+            )  # Within 80% of max score
+
             # Post-process results
-            formatted_results = []
+            processed_results = []
             for match in results.matches:
-                if match.score < score_threshold:
+                # Skip results below threshold or cutoff
+                if match.score < score_threshold or match.score < score_cutoff:
                     continue
 
-                formatted_results.append(
-                    {
-                        "text": match.metadata["text"],
-                        "metadata": {
-                            "file_path": match.metadata["file_path"],
-                            "page_number": match.metadata["page_number"],
-                            "score": float(match.score),  # Ensure score is float
-                            "chunk_index": match.metadata.get("chunk_index", 0),
-                        },
-                    }
+                processed_result = {
+                    "text": match.metadata["text"],
+                    "metadata": {
+                        "file_path": match.metadata["file_path"],
+                        "page_number": match.metadata["page_number"],
+                        "score": float(match.score),
+                        "file_id": match.metadata["file_id"],
+                    },
+                }
+
+                # Add processed_text if available
+                if "processed_text" in match.metadata:
+                    processed_result["processed_text"] = match.metadata[
+                        "processed_text"
+                    ]
+
+                logger.debug(
+                    f"Match score: {match.score:.4f}, "
+                    f"Page: {match.metadata['page_number']}, "
+                    f"Preview: {match.metadata['processed_text'][:100]}..."
                 )
+
+                processed_results.append(processed_result)
 
             # Sort by score and take top_k
-            formatted_results.sort(key=lambda x: x["metadata"]["score"], reverse=True)
-            formatted_results = formatted_results[:top_k]
+            processed_results.sort(key=lambda x: x["metadata"]["score"], reverse=True)
+            processed_results = processed_results[:top_k]
 
-            # Log result details
+            end_time = datetime.utcnow()
             logger.info(
-                f"Found {len(formatted_results)} results above threshold {score_threshold}"
+                f"[{end_time}] Returning {len(processed_results)} results "
+                f"above score cutoff {score_cutoff:.4f}"
             )
-            for i, result in enumerate(formatted_results):
-                logger.debug(
-                    f"Result {i+1}: Score={result['metadata']['score']:.4f}, "
-                    f"Page={result['metadata']['page_number']}"
+
+            # Log the final selected results
+            for i, result in enumerate(processed_results):
+                logger.info(
+                    f"Result {i+1}: "
+                    f"Score={result['metadata']['score']:.4f}, "
+                    f"Page={result['metadata']['page_number']}, "
+                    f"Delta from max={max_score - result['metadata']['score']:.4f}"
                 )
 
-            return formatted_results
+            return processed_results
 
         except Exception as e:
             logger.error(f"Error during similarity search: {str(e)}", exc_info=True)

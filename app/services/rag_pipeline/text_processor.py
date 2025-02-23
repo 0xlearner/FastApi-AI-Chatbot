@@ -14,7 +14,9 @@ try:
 except Exception as e:
     logging.warning(f"Failed to download NLTK data: {str(e)}")
 
-logger = logging.getLogger(__name__)
+from app.utils.logging import get_pipeline_logger
+
+logger = get_pipeline_logger("text_processor")
 
 
 class TextProcessor:

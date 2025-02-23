@@ -5,8 +5,11 @@ from app.services.pdf_service import PDFService
 from sqlalchemy.orm import Session
 from typing import Dict, Optional
 import logging
+from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from app.utils.logging import get_service_logger
+
+logger = get_service_logger("chat_service")
 
 
 class ChatService:
@@ -21,7 +24,7 @@ class ChatService:
         self.vector_store = vector_store
         self.llm = llm
         self.pdf_service = pdf_service
-        logger.info("ChatService initialized")
+        logger.info(f"[{datetime.utcnow()}] ChatService initialized")
 
     async def verify_pdf_access(self, file_id: str, user_id: int, db: Session) -> bool:
         """Verify if a user has access to a specific PDF"""
@@ -29,25 +32,22 @@ class ChatService:
 
     async def get_response(self, query: str, file_id: str, db: Session) -> Dict:
         """Get a response for a query about a specific PDF"""
-        logger.info(f"Processing query: '{query}' for file_id: {file_id}")
-
         try:
-            # Generate query embedding
-            logger.debug("Generating query embedding")
-            query_embeddings = await self.embeddings.get_embeddings([query])
-            logger.debug(
-                f"Generated embedding with dimension {len(query_embeddings[0])}"
+            start_time = datetime.utcnow()
+            logger.info(
+                f"[{start_time}] Processing query: '{query}' for file_id: {file_id}"
             )
 
-            # Retrieve relevant context with improved search
-            logger.debug(
-                f"Searching for relevant content with file_id filter: {file_id}"
-            )
+            # Generate query embedding
+            query_embeddings = await self.embeddings.get_embeddings([query])
+
+            # Retrieve relevant context
             results = await self.vector_store.similarity_search(
                 query_embedding=query_embeddings[0],
                 top_k=5,
                 metadata_filter={"file_id": file_id},
-                score_threshold=0.3,
+                score_threshold=0.2,
+                min_score_cutoff=0.3,
             )
 
             if not results:
@@ -60,34 +60,27 @@ class ChatService:
                     "sources": [],
                 }
 
-            # Log search results
-            logger.info(f"Found {len(results)} relevant chunks")
-            for i, result in enumerate(results):
-                logger.debug(
-                    f"Result {i+1}: "
-                    f"Score={result['metadata']['score']:.4f}, "
-                    f"Page={result['metadata']['page_number']}, "
-                    f"Length={len(result['text'])} chars"
-                )
-
-            # Generate response
-            logger.debug("Generating response using LLM")
+            # Generate response using all relevant chunks
             response = await self.llm.generate_response(query, results)
-            logger.info(f"Generated response of length {len(response)} characters")
 
-            return {
-                "response": response,
-                "sources": [
-                    {
-                        "page_number": result["metadata"]["page_number"],
-                        "file_path": result["metadata"]["file_path"],
-                        "score": result["metadata"]["score"],
-                        "text_preview": result["text"][:100]
-                        + "...",  # Add text preview
-                    }
-                    for result in results
-                ],
-            }
+            # Only include the highest scoring result in sources
+            top_result = results[0]  # Results are already sorted by score
+            sources = [
+                {
+                    "page_number": top_result["metadata"]["page_number"],
+                    "file_path": top_result["metadata"]["file_path"],
+                    "score": top_result["metadata"]["score"],
+                    "text_preview": top_result["processed_text"][:100] + "...",
+                }
+            ]
+
+            end_time = datetime.utcnow()
+            logger.info(
+                f"[{end_time}] Completed response generation. "
+                f"Processing time: {(end_time - start_time).total_seconds():.2f}s"
+            )
+
+            return {"response": response, "sources": sources}
 
         except Exception as e:
             logger.error(f"Error in get_response: {str(e)}", exc_info=True)
