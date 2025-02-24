@@ -1,9 +1,6 @@
 from typing import List, Dict
 import httpx
-import logging
-import json
 import time
-import asyncio
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -31,7 +28,8 @@ class OllamaLLM:
     async def _make_llm_request(self, prompt: str) -> str:
         """Make request to Ollama with retry logic"""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            logger.debug(f"Sending request to Ollama API: {self.base_url}/api/generate")
+            logger.debug(f"Sending request to Ollama API: {
+                         self.base_url}/api/generate")
             response = await client.post(
                 f"{self.base_url}/api/generate",
                 json={
@@ -64,12 +62,13 @@ class OllamaLLM:
                     )
                 ]
             )
-            logger.debug(f"Formatted context length: {len(context_text)} characters")
+            logger.debug(f"Formatted context length: {
+                         len(context_text)} characters")
 
             # Create a more focused prompt
             prompt = f"""You are a helpful assistant answering questions about a document. Use the following context to answer the question.
             If the answer is not in the context, say "I cannot find information about that in the document."
-            
+
             Context:
             {context_text}
 
@@ -77,13 +76,15 @@ class OllamaLLM:
 
             Answer (be concise and specific):"""
 
-            logger.debug(f"Generated prompt with length: {len(prompt)} characters")
+            logger.debug(f"Generated prompt with length: {
+                         len(prompt)} characters")
 
             # Try to get response with retries
             try:
                 response = await self._make_llm_request(prompt)
                 processing_time = time.time() - start_time
-                logger.info(f"Generated response in {processing_time:.2f} seconds")
+                logger.info(f"Generated response in {
+                            processing_time:.2f} seconds")
                 return response
             except httpx.ReadTimeout:
                 logger.warning("All retry attempts failed due to timeout")
@@ -92,8 +93,10 @@ class OllamaLLM:
                 if most_relevant and most_relevant["metadata"]["score"] > 0.2:
                     return (
                         f"While I'm having trouble generating a complete response, "
-                        f"I found relevant information on page {most_relevant['metadata']['page_number']}. "
-                        f"Here's the relevant excerpt:\n\n{most_relevant['text']}"
+                        f"I found relevant information on page {
+                            most_relevant['metadata']['page_number']}. "
+                        f"Here's the relevant excerpt:\n\n{
+                            most_relevant['text']}"
                     )
                 return (
                     "I found some potentially relevant information but am having trouble processing it. "

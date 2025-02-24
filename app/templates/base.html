@@ -1,62 +1,57 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{% block title %}PDF Chat{% endblock %}</title>
+        {% block head %}{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}PDF Chatbot{% endblock %}</title>
-    <link href="/static/css/utilities.css" rel="stylesheet">
-    <script src="/static/js/chat.js" defer></script>
-    <!-- Add HTMX extensions -->
-    <script src="https://unpkg.com/htmx.org/dist/ext/client-side-templates.js"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/loading-states.js"></script>
-    <script>
-        document.body.addEventListener('htmx:afterRequest', function (evt) {
-            if (evt.detail.elt.hasAttribute('hx-target')) {
-                const targetId = evt.detail.elt.getAttribute('hx-target').replace('#', '');
-                scrollToBottom(targetId);
-            }
-        });
-    </script>
-</head>
+        <!-- Tailwind CSS -->
+        <script src="https://cdn.tailwindcss.com"></script>
 
-<body class="bg-gray-100 min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <a href="/" class="text-xl font-bold text-indigo-600">PDF Chatbot</a>
-                    </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                        <a href="/"
-                            class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Home
-                        </a>
-                        <a href="/pdfs"
-                            class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            My PDFs
-                        </a>
-                    </div>
-                </div>
-                <div class="flex items-center">
+        <!-- HTMX Core -->
+        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+        <!-- HTMX WebSocket Extension -->
+        <script src="https://unpkg.com/htmx.org/dist/ext/ws.js"></script>
+
+        {% block extra_head %}{% endblock %}
+    </head>
+    <body class="bg-gray-100 min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-indigo-600 text-white p-4">
+            <div class="container mx-auto flex justify-between items-center">
+                <a href="/" class="text-xl font-bold">PDF Chat</a>
+                <div class="space-x-4">
                     {% if user %}
-                    <span class="text-gray-700 mr-4">{{ user.username }}</span>
-                    <a href="/logout" class="text-gray-500 hover:text-gray-700">Logout</a>
+                    <span>Welcome, {{ user.email }}</span>
+                    <a href="/pdfs" class="hover:text-indigo-200">My PDFs</a>
+                    <a href="/logout" class="hover:text-indigo-200">Logout</a>
                     {% else %}
-                    <a href="/login" class="text-gray-500 hover:text-gray-700 mr-4">Login</a>
-                    <a href="/signup" class="text-indigo-600 hover:text-indigo-500">Sign up</a>
+                    <a href="/login" class="hover:text-indigo-200">Login</a>
+                    <a href="/signup" class="hover:text-indigo-200">Sign Up</a>
                     {% endif %}
                 </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <!-- Content -->
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {% block content %}{% endblock %}
-    </main>
-</body>
+        <!-- Main Content -->
+        <main>{% block content %}{% endblock %}</main>
 
+        <!-- Base Scripts -->
+        <script>
+            // Initialize HTMX WebSocket Extension
+            document.addEventListener("DOMContentLoaded", function () {
+                htmx.defineExtension("ws", {
+                    onEvent: function (name, evt) {
+                        if (name === "htmx:wsConnected") {
+                            console.log("WebSocket Connected");
+                        }
+                    },
+                });
+            });
+        </script>
+
+        {% block extra_js %}{% endblock %}
+    </body>
 </html>

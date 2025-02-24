@@ -1,16 +1,12 @@
 from PyPDF2 import PdfReader
 from typing import List, Dict, AsyncGenerator
 import uuid
-import os
-import logging
 import asyncio
 import gc
-from datetime import datetime
 
 from app.utils.logging import get_pipeline_logger
 
 logger = get_pipeline_logger("document_processor")
-
 
 class DocumentProcessor:
     def __init__(
@@ -29,20 +25,91 @@ class DocumentProcessor:
             f"chunk_overlap={chunk_overlap}, batch_size={batch_size}"
         )
 
-    async def process_pdf(self, file_path: str) -> AsyncGenerator[List[Dict], None]:
-        """Process PDF and yield chunks in batches"""
-        start_time = datetime.utcnow()
-        logger.info(f"[{start_time}] Starting PDF processing for file: {file_path}")
+    def _create_chunks(self, text: str) -> List[str]:
+        """Split text into chunks with overlap"""
+        logger.debug(f"Creating chunks from text of length {len(text)}")
+        chunks = []
+
+        if len(text) <= self.chunk_size:
+            chunks.append(text)
+            logger.debug("Text fits in single chunk")
+        else:
+            start = 0
+            while start < len(text):
+                end = start + self.chunk_size
+                # Find the last period or newline in chunk_size range
+                if end < len(text):
+                    for break_char in [". ", "\n", ". ", ", ", " "]:
+                        last_break = text[start:end].rfind(break_char)
+                        if last_break != -1:
+                            end = start + last_break + 1
+                            break
+
+                chunk = text[start:end].strip()
+                if chunk:
+                    chunks.append(chunk)
+                    logger.debug(
+                        f"Created chunk {len(chunks)} with length {len(chunk)}"
+                    )
+                start = end - self.chunk_overlap
+
+                # Force garbage collection periodically
+                if len(chunks) % 10 == 0:
+                    gc.collect()
+                    logger.debug("Performed garbage collection")
+
+        logger.info(f"Created {len(chunks)} chunks from text")
+        return chunks
+
+    async def _process_page(self, page, page_num: int, file_path: str) -> List[Dict]:
+        """Process a single page and return its chunks with metadata"""
+        logger.info(f"Processing page {page_num + 1}")
 
         try:
-            # Validate PDF file
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"PDF file not found: {file_path}")
+            # Extract text
+            text = page.extract_text()
+            logger.debug(f"Extracted {len(text)} characters from page {page_num + 1}")
 
+            if not text.strip():
+                logger.warning(f"No text content found in page {page_num + 1}")
+                return []
+
+            # Create chunks
+            chunks = self._create_chunks(text)
+            logger.debug(f"Created {len(chunks)} chunks from page {page_num + 1}")
+
+            # Create chunk dictionaries with metadata
+            chunk_dicts = []
+            for i, chunk in enumerate(chunks, 1):
+                chunk_id = str(uuid.uuid4())
+                chunk_dicts.append(
+                    {
+                        "text": chunk,
+                        "metadata": {
+                            "file_path": file_path,
+                            "page_number": page_num + 1,
+                            "chunk_id": chunk_id,
+                            "chunk_number": i,
+                        },
+                    }
+                )
+                logger.debug(f"Created chunk dict {i} with ID {chunk_id}")
+
+            logger.info(
+                f"Successfully processed page {page_num + 1} into {len(chunk_dicts)} chunks"
+            )
+            return chunk_dicts
+
+        except Exception as e:
+            logger.error(f"Error processing page {page_num + 1}: {str(e)}")
+            return []
+
+    async def process_pdf(self, file_path: str) -> AsyncGenerator[List[Dict], None]:
+        """Process PDF and yield chunks in batches"""
+        logger.info(f"Starting PDF processing for file: {file_path}")
+
+        try:
             pdf_reader = PdfReader(file_path)
-            if len(pdf_reader.pages) == 0:
-                raise ValueError("PDF file is empty")
-
             total_pages = len(pdf_reader.pages)
             logger.info(f"PDF has {total_pages} pages")
 
@@ -52,29 +119,12 @@ class DocumentProcessor:
             for page_num in range(total_pages):
                 try:
                     page = pdf_reader.pages[page_num]
-                    text = page.extract_text()
+                    page_chunks = await self._process_page(page, page_num, file_path)
 
-                    if not text.strip():
-                        logger.warning(f"Page {page_num + 1} is empty")
-                        continue
-
-                    chunks = self._create_chunks(text)
-
-                    for chunk in chunks:
-                        if not chunk.strip():
-                            continue
-
-                        chunk_dict = {
-                            "text": chunk,
-                            "metadata": {
-                                "file_path": file_path,
-                                "page_number": page_num + 1,
-                                "chunk_id": str(uuid.uuid4()),
-                            },
-                        }
-
+                    for chunk_dict in page_chunks:
                         current_batch.append(chunk_dict)
                         processed_chunks += 1
+                        logger.debug(f"Added chunk {processed_chunks} to current batch")
 
                         if len(current_batch) >= self.batch_size:
                             logger.info(
@@ -82,8 +132,9 @@ class DocumentProcessor:
                             )
                             yield current_batch
                             current_batch = []
-                            await asyncio.sleep(0.1)  # Prevent overload
-                            gc.collect()  # Force garbage collection
+                            await asyncio.sleep(2)
+                            gc.collect()
+                            logger.debug("Performed garbage collection after batch")
 
                     logger.info(
                         f"Completed processing page {page_num + 1}/{total_pages}"
@@ -98,47 +149,13 @@ class DocumentProcessor:
                 logger.info(f"Yielding final batch of {len(current_batch)} chunks")
                 yield current_batch
 
-            end_time = datetime.utcnow()
-            processing_time = (end_time - start_time).total_seconds()
             logger.info(
-                f"[{end_time}] Completed PDF processing. "
-                f"Total chunks: {processed_chunks}, "
-                f"Time: {processing_time:.2f}s"
+                f"Completed PDF processing. Total chunks processed: {processed_chunks}"
             )
 
         except Exception as e:
-            logger.error(f"Error processing PDF file: {str(e)}", exc_info=True)
-            raise
-
-    def _create_chunks(self, text: str) -> List[str]:
-        """Split text into chunks with overlap"""
-        chunks = []
-
-        if not text:
-            return chunks
-
-        if len(text) <= self.chunk_size:
-            chunks.append(text)
-            return chunks
-
-        start = 0
-        while start < len(text):
-            end = start + self.chunk_size
-
-            if end < len(text):
-                # Find the last sentence break
-                for break_char in [". ", "\n", ". ", ", ", " "]:
-                    last_break = text[start:end].rfind(break_char)
-                    if last_break != -1:
-                        end = start + last_break + 1
-                        break
-
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-            start = end - self.chunk_overlap
-
-            if len(chunks) % 10 == 0:
-                gc.collect()
-
-        return chunks
+            logger.error(f"Error processing PDF file: {str(e)}")
+            raise Exception(f"Error processing PDF file: {str(e)}")
+        finally:
+            gc.collect()
+            logger.info("Completed PDF processing and cleanup")

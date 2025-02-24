@@ -1,3 +1,8 @@
+/* Progress bar animations */
+.progress-bar {
+    transition: width 0.3s ease-in-out;
+}
+
 /* Custom scrollbar */
 .custom-scrollbar {
     scrollbar-width: thin;

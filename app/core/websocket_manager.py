@@ -1,48 +1,60 @@
 from fastapi import WebSocket
-from typing import Dict, List
-import logging
+from typing import Dict, List, Any
 import json
-from datetime import datetime
+import asyncio
+from app.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("websocket_manager")
 
-class ConnectionManager:
+
+class WebSocketManager:
     def __init__(self):
-        self.active_connections: Dict[str, List[WebSocket]] = {}
+        # Change the structure to include user_id
+        self.active_connections: Dict[str, Dict[int, List[WebSocket]]] = {}
+        self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket, file_id: str):
-        logger.info(f"[{datetime.utcnow()}] Accepting WebSocket connection for file_id: {file_id}")
-        await websocket.accept()
-        if file_id not in self.active_connections:
-            self.active_connections[file_id] = []
-        self.active_connections[file_id].append(websocket)
-        logger.info(f"[{datetime.utcnow()}] Active connections for file_id {file_id}: {len(self.active_connections[file_id])}")
+    async def connect(self, websocket: WebSocket, file_id: str, user_id: int):
+        """Connect a websocket client"""
+        async with self._lock:
+            if file_id not in self.active_connections:
+                self.active_connections[file_id] = {}
+            if user_id not in self.active_connections[file_id]:
+                self.active_connections[file_id][user_id] = []
+            self.active_connections[file_id][user_id].append(websocket)
+            logger.info(f"WebSocket client connected for file_id: {
+                        file_id}, user_id: {user_id}")
 
-    async def disconnect(self, websocket: WebSocket, file_id: str):
-        if file_id in self.active_connections:
-            self.active_connections[file_id].remove(websocket)
-            if not self.active_connections[file_id]:
-                del self.active_connections[file_id]
-            logger.info(f"[{datetime.utcnow()}] Disconnected WebSocket for file_id: {file_id}")
-        else:
-            logger.warning(f"[{datetime.utcnow()}] Attempted to disconnect non-existent connection for file_id: {file_id}")
-
-    async def send_progress(self, file_id: str, data: dict):
-        if file_id in self.active_connections:
-            logger.info(f"[{datetime.utcnow()}] Sending progress update for file_id {file_id}: {json.dumps(data)}")
-            failed_connections = []
-            for connection in self.active_connections[file_id]:
+    async def disconnect(self, websocket: WebSocket, file_id: str, user_id: int):
+        """Disconnect a websocket client"""
+        async with self._lock:
+            if file_id in self.active_connections and user_id in self.active_connections[file_id]:
                 try:
-                    await connection.send_json(data)
-                except Exception as e:
-                    logger.error(f"Error sending progress update to connection: {str(e)}")
-                    failed_connections.append(connection)
-            
-            # Remove failed connections
-            for failed in failed_connections:
-                self.active_connections[file_id].remove(failed)
-            
-            if failed_connections:
-                logger.warning(f"Removed {len(failed_connections)} failed connections for file_id {file_id}")
-        else:
-            logger.warning(f"[{datetime.utcnow()}] No active connections found for file_id: {file_id}")
+                    self.active_connections[file_id][user_id].remove(websocket)
+                    if not self.active_connections[file_id][user_id]:
+                        del self.active_connections[file_id][user_id]
+                    if not self.active_connections[file_id]:
+                        del self.active_connections[file_id]
+                except ValueError:
+                    pass
+            logger.info(f"WebSocket client disconnected for file_id: {
+                        file_id}, user_id: {user_id}")
+
+    async def send_progress(self, file_id: str, user_id: int, data: dict):
+        """Send progress update to all connected clients for a specific file and user"""
+        if (file_id not in self.active_connections or
+                user_id not in self.active_connections[file_id]):
+            return
+
+        message = json.dumps(data)
+        disconnected = []
+
+        for websocket in self.active_connections[file_id][user_id]:
+            try:
+                await websocket.send_text(message)
+            except Exception as e:
+                logger.error(f"Error sending progress update: {str(e)}")
+                disconnected.append(websocket)
+
+        # Clean up disconnected clients
+        for websocket in disconnected:
+            await self.disconnect(websocket, file_id, user_id)

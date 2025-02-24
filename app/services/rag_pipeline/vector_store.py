@@ -1,7 +1,5 @@
-from pinecone import Pinecone, Index
+from pinecone import Pinecone
 from typing import List, Dict, Any, Optional
-import logging
-import numpy as np
 from datetime import datetime
 
 from app.services.rag_pipeline.text_processor import TextProcessor
@@ -21,13 +19,15 @@ class PineconeStore:
         self, embeddings: List[List[float]], documents: List[Dict]
     ):
         """Upsert documents and their embeddings to Pinecone"""
-        logger.info(f"Starting upsert of {len(documents)} documents to Pinecone")
+        logger.info(f"Starting upsert of {
+                    len(documents)} documents to Pinecone")
 
         try:
             vectors = []
             for i, (embedding, doc) in enumerate(zip(embeddings, documents)):
                 # Process text for better searchability
-                processed_text = self.text_processor.preprocess_text(doc["text"])
+                processed_text = self.text_processor.preprocess_text(
+                    doc["text"])
                 keywords = self.text_processor.extract_keywords(doc["text"])
 
                 metadata = {
@@ -51,7 +51,8 @@ class PineconeStore:
 
             # Upsert to Pinecone
             self.index.upsert(vectors=vectors)
-            logger.info(f"Successfully completed upsert of {len(documents)} documents")
+            logger.info(f"Successfully completed upsert of {
+                        len(documents)} documents")
 
         except Exception as e:
             logger.error(f"Error during Pinecone upsert: {str(e)}")
@@ -71,7 +72,8 @@ class PineconeStore:
         try:
             start_time = datetime.utcnow()
             logger.info(
-                f"[{start_time}] Starting similarity search with filter: {metadata_filter}"
+                f"[{start_time}] Starting similarity search with filter: {
+                    metadata_filter}"
             )
 
             # Query Pinecone
@@ -83,7 +85,8 @@ class PineconeStore:
                 filter=metadata_filter,
             )
 
-            logger.info(f"Got {len(results.matches)} initial matches from Pinecone")
+            logger.info(f"Got {len(results.matches)
+                               } initial matches from Pinecone")
 
             # Find the highest score
             if results.matches:
@@ -130,7 +133,8 @@ class PineconeStore:
                 processed_results.append(processed_result)
 
             # Sort by score and take top_k
-            processed_results.sort(key=lambda x: x["metadata"]["score"], reverse=True)
+            processed_results.sort(
+                key=lambda x: x["metadata"]["score"], reverse=True)
             processed_results = processed_results[:top_k]
 
             end_time = datetime.utcnow()
@@ -145,11 +149,13 @@ class PineconeStore:
                     f"Result {i+1}: "
                     f"Score={result['metadata']['score']:.4f}, "
                     f"Page={result['metadata']['page_number']}, "
-                    f"Delta from max={max_score - result['metadata']['score']:.4f}"
+                    f"Delta from max={max_score -
+                                      result['metadata']['score']:.4f}"
                 )
 
             return processed_results
 
         except Exception as e:
-            logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
+            logger.error(f"Error during similarity search: {
+                         str(e)}", exc_info=True)
             raise

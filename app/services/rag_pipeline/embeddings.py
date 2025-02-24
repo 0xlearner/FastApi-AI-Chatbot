@@ -1,9 +1,7 @@
 from typing import List
 import httpx
-import logging
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential
-import numpy as np
 
 from app.utils.logging import get_pipeline_logger
 
@@ -49,9 +47,10 @@ class OllamaEmbeddings:
 
         # Process in smaller batches
         for i in range(0, len(texts), self.batch_size):
-            batch = texts[i : i + self.batch_size]
+            batch = texts[i: i + self.batch_size]
             logger.info(
-                f"Processing batch {i//self.batch_size + 1}/{-(-len(texts)//self.batch_size)}"
+                f"Processing batch {i//self.batch_size +
+                                    1}/{-(-len(texts)//self.batch_size)}"
             )
 
             # Process batch concurrently but with rate limiting
@@ -63,7 +62,8 @@ class OllamaEmbeddings:
                 for j, embedding in enumerate(batch_embeddings):
                     if isinstance(embedding, Exception):
                         logger.error(
-                            f"Error in batch {i//self.batch_size + 1}, item {j}: {str(embedding)}"
+                            f"Error in batch {
+                                i//self.batch_size + 1}, item {j}: {str(embedding)}"
                         )
                         # Use zero vector as fallback
                         all_embeddings.append([0.0] * 768)

@@ -1,7 +1,13 @@
 from sqlalchemy.orm import Session
 from app.models.domain.user import User
-from app.core.security import get_password_hash
 from app.schemas.user import UserCreate
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
 
 def get_user_by_email(db: Session, email: str):

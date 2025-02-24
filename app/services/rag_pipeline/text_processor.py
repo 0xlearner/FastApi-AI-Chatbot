@@ -1,6 +1,6 @@
 from typing import List, Union
 import re
-from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 import nltk
@@ -56,7 +56,8 @@ class TextProcessor:
                 if word not in self.stop_words
             ]
             logger.debug(
-                f"Processed to {len(processed_words)} words after stop word removal and lemmatization"
+                f"Processed to {
+                    len(processed_words)} words after stop word removal and lemmatization"
             )
 
             result = " ".join(processed_words)
@@ -70,7 +71,8 @@ class TextProcessor:
     def extract_keywords(self, text: Union[str, List]) -> List[str]:
         """Extract important keywords from text"""
         if isinstance(text, list):
-            logger.warning("Received list instead of string for keyword extraction")
+            logger.warning(
+                "Received list instead of string for keyword extraction")
             return []
 
         try:

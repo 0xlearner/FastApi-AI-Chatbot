@@ -1,18 +1,11 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.crud.user import get_user_by_email
-from app.services.pdf_service import PDFService
-from app.services.chat_service import ChatService
-from app.services.rag_pipeline.document_processor import DocumentProcessor
-from app.services.rag_pipeline.embeddings import OllamaEmbeddings
-from app.services.rag_pipeline.vector_store import PineconeStore
-from app.services.rag_pipeline.llm import OllamaLLM
+from app.core.service_container import services
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 
 # Database dependency
@@ -24,83 +17,42 @@ def get_db():
         db.close()
 
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-
-    user = get_user_by_email(db, email)
-    if user is None:
-        raise credentials_exception
-    return user
+# Service dependencies with initialization check
+def ensure_services_initialized():
+    if not services.is_initialized():
+        services.initialize_services()
+    return services
 
 
-# Service dependencies
 def get_document_processor():
-    return DocumentProcessor(
-        upload_dir=settings.UPLOAD_DIR,
-        chunk_size=settings.CHUNK_SIZE,
-        chunk_overlap=settings.CHUNK_OVERLAP,
-        batch_size=settings.BATCH_SIZE,
-    )
+    return ensure_services_initialized().document_processor
 
 
 def get_embeddings():
-    return OllamaEmbeddings(
-        base_url=settings.OLLAMA_BASE_URL,
-        model_name=settings.EMBEDDING_MODEL_NAME,
-    )
+    return ensure_services_initialized().embeddings
 
 
 def get_vector_store():
-    return PineconeStore(
-        api_key=settings.PINECONE_API_KEY,
-        environment=settings.PINECONE_ENVIRONMENT,
-        index_name=settings.PINECONE_INDEX_NAME,
-    )
+    return ensure_services_initialized().vector_store
 
 
 def get_llm():
-    return OllamaLLM(
-        base_url=settings.OLLAMA_BASE_URL, model_name=settings.LLM_MODEL_NAME
-    )
+    return ensure_services_initialized().llm
 
 
-def get_pdf_service(
-    document_processor: DocumentProcessor = Depends(get_document_processor),
-    embeddings: OllamaEmbeddings = Depends(get_embeddings),
-    vector_store: PineconeStore = Depends(get_vector_store),
-) -> PDFService:
-    return PDFService(
-        document_processor=document_processor,
-        embeddings=embeddings,
-        vector_store=vector_store,
-        upload_dir=settings.UPLOAD_DIR,
-    )
+def get_websocket_manager():
+    return ensure_services_initialized().websocket_manager
 
 
-def get_chat_service(
-    embeddings: OllamaEmbeddings = Depends(get_embeddings),
-    vector_store: PineconeStore = Depends(get_vector_store),
-    llm: OllamaLLM = Depends(get_llm),
-    pdf_service: PDFService = Depends(get_pdf_service),
-) -> ChatService:
-    return ChatService(
-        embeddings=embeddings,
-        vector_store=vector_store,
-        llm=llm,
-        pdf_service=pdf_service,
-    )
+def get_pdf_service():
+    pdf_service = ensure_services_initialized().pdf_service
+    if pdf_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="PDF service not initialized"
+        )
+    return pdf_service
+
+
+def get_chat_service():
+    return ensure_services_initialized().chat_service
