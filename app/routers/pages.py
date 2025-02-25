@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, get_current_user_or_none
 from app.models.domain.message import Message as MessageModel
 from app.models.domain.pdf import PDF as PDFModel
+from app.models.domain.vote import Vote as VoteModel
 from app.models.domain.user import User
 from app.repositories.pdf_repository import PDFRepository
 
@@ -127,12 +128,27 @@ async def chat_page(
         .all()
     )
 
+    # Get user votes
+    message_ids = [message.id for message in messages]
+    user_votes = {}
+    if message_ids:
+        votes = (
+            db.query(VoteModel)
+            .filter(
+                VoteModel.user_id == current_user.id,
+                VoteModel.message_id.in_(message_ids)
+            )
+            .all()
+        )
+        user_votes = {vote.message_id: vote.vote_type for vote in votes}
+
     return request.app.state.templates.TemplateResponse(
         "chat.html",
         {
             "request": request,
             "pdf": pdf,
             "messages": messages,
+            "user_votes": user_votes,
             "user": current_user
         }
     )

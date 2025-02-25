@@ -1,66 +1,66 @@
 {% for message in messages %}
-<div class="flex justify-{{ 'end' if message.role == 'user' else 'start' }} message-in">
-    <div class="max-w-[70%] {{ 'bg-indigo-600 text-white' if message.role == 'user' else 'bg-white' }} rounded-lg px-4 py-2 shadow message-wrapper">
-        <!-- Message Header with Timestamp -->
-        <div class="flex justify-between items-center mb-1">
-            <span class="text-xs {{ 'text-gray-200' if message.role == 'user' else 'text-gray-500' }}">
-                {{ message.role|title }} • {{ message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
-            </span>
+<div class="message-wrapper message-in">
+    {% if message.role == 'user' %}
+    <div class="flex justify-end">
+        <div class="max-w-[70%] bg-indigo-600 text-white rounded-lg px-4 py-2 shadow">
+            <p class="text-sm">{{ message.content }}</p>
         </div>
-
-        <!-- Message Content -->
-        <p class="text-sm">{{ message.content }}</p>
-
-        <!-- Sources and Voting (only for assistant messages) -->
-        {% if message.role == 'assistant' %}
-            {% if message.sources %}
-                <!-- Sources section -->
-                {% set sources = message.sources|fromjson %}
+    </div>
+    {% else %}
+    <div class="flex justify-start">
+        <div class="max-w-[70%] bg-white rounded-lg px-4 py-2 shadow">
+            <div class="flex flex-col gap-2">
+                <p class="text-sm text-gray-700">{{ message.content }}</p>
+                {% if message.sources %}
+                <div class="mt-2 text-xs text-gray-500">
+                    <p class="font-medium">Sources:</p>
+                    <ul class="list-disc list-inside">
+                        {% set sources = message.sources|fromjson %}
                         <div class="mt-2 text-xs {{ 'text-gray-500' if message.role == 'assistant' else 'text-gray-200' }}">
-                            <p>Sources:</p>
-                            {% for source in sources %}
-                            <div class="mt-1">
-                                <p class="font-medium">Page {{ source.page_number|int }}:</p>
-                                <p class="italic">{{ source.text_preview }}</p>
-                            </div>
-                            {% endfor %}
-            {% endif %}
-
-            <!-- Voting buttons -->
-            <div class="mt-2 flex items-center gap-4 text-sm text-gray-500">
-                <!-- Upvote -->
-                <div class="flex items-center gap-1">
-                    <button
-                        class="vote-button p-1 rounded hover:bg-gray-100 transition-colors {{ 'text-indigo-600 bg-indigo-50' if user_votes and user_votes.get(message.id) == 'upvote' }}"
-                        data-message-id="{{ message.id }}"
-                        data-vote-type="upvote"
-                        onclick="handleVoteClick(this)"
-                        {{ 'disabled' if user_votes and user_votes.get(message.id) == 'downvote' }}
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"></path>
-                        </svg>
-                    </button>
-                    <span class="vote-count" data-vote-type="upvote">{{ message.upvotes or 0 }}</span>
+                        {% for source in sources %}
+                        <div class="mt-1">
+                            <p class="font-medium">Page {{ source.page_number|int }}:</p>
+                            <p class="italic">{{ source.text_preview }}</p>
+                        </div>
+                        {% endfor %}
+                    </ul>
                 </div>
-
-                <!-- Downvote -->
-                <div class="flex items-center gap-1">
-                    <button
-                        class="vote-button p-1 rounded hover:bg-gray-100 transition-colors {{ 'text-indigo-600 bg-indigo-50' if user_votes and user_votes.get(message.id) == 'downvote' }}"
-                        data-message-id="{{ message.id }}"
-                        data-vote-type="downvote"
-                        onclick="handleVoteClick(this)"
-                        {{ 'disabled' if user_votes and user_votes.get(message.id) == 'upvote' }}
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5 6h2a2 2 0 002-2v-6a2 2 0 00-2-2h-2.5"></path>
-                        </svg>
-                    </button>
-                    <span class="vote-count" data-vote-type="downvote">{{ message.downvotes or 0 }}</span>
+                {% endif %}
+                
+                <!-- Voting Controls -->
+                <div class="flex items-center gap-4 mt-2">
+                    <div class="flex items-center gap-1">
+                        <button 
+                            onclick="handleVoteClick(this)"
+                            data-message-id="{{ message.id }}"
+                            data-vote-type="upvote"
+                            class="vote-button p-1 rounded-full hover:bg-gray-100 {% if user_votes and message.id in user_votes and user_votes[message.id] == 'upvote' %}text-indigo-600 bg-indigo-50{% endif %}"
+                            {% if user_votes and message.id in user_votes and user_votes[message.id] == 'downvote' %}disabled{% endif %}
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                        </button>
+                        <span class="vote-count text-xs text-gray-500" data-vote-type="upvote">{{ message.upvotes|default(0) }}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button 
+                            onclick="handleVoteClick(this)"
+                            data-message-id="{{ message.id }}"
+                            data-vote-type="downvote"
+                            class="vote-button p-1 rounded-full hover:bg-gray-100 {% if user_votes and message.id in user_votes and user_votes[message.id] == 'downvote' %}text-indigo-600 bg-indigo-50{% endif %}"
+                            {% if user_votes and message.id in user_votes and user_votes[message.id] == 'upvote' %}disabled{% endif %}
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <span class="vote-count text-xs text-gray-500" data-vote-type="downvote">{{ message.downvotes|default(0) }}</span>
+                    </div>
                 </div>
             </div>
-        {% endif %}
+        </div>
     </div>
+    {% endif %}
 </div>
 {% endfor %}

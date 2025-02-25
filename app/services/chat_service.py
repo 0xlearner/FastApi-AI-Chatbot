@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List
 
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,52 @@ class ChatService:
     async def verify_pdf_access(self, file_id: str, user_id: int, db: Session) -> bool:
         """Verify if a user has access to a specific PDF"""
         return await self.pdf_repository.verify_pdf_access(file_id, user_id, db)
+
+    async def get_chat_history(
+        self,
+        file_id: str,
+        user_id: int,
+        db: Session,
+        limit: int = None
+    ) -> List[Dict]:
+        messages = self.chat_repository.get_chat_history(
+            db, file_id, user_id, limit)
+        return [
+            {
+                "role": msg.role,
+                "content": msg.content,
+                "sources": msg.sources,
+                "created_at": msg.created_at.isoformat()
+            }
+            for msg in messages
+        ]
+
+    async def save_message_pair(
+        self,
+        user_id: int,
+        file_id: str,
+        user_message: str,
+        assistant_response: Dict,
+        db: Session
+    ):
+        # Save user message
+        self.chat_repository.save_message(
+            db=db,
+            user_id=user_id,
+            file_id=file_id,
+            content=user_message,
+            role="user"
+        )
+
+        # Save assistant response
+        self.chat_repository.save_message(
+            db=db,
+            user_id=user_id,
+            file_id=file_id,
+            content=assistant_response["response"],
+            role="assistant",
+            sources=assistant_response.get("sources")
+        )
 
     async def get_response(self, query: str, file_id: str, db: Session) -> Dict:
         """Get a response for a query about a specific PDF"""

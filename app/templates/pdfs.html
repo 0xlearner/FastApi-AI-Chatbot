@@ -50,9 +50,31 @@
                     <button
                         type="button"
                         id="uploadButton"
-                        class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
                     >
-                        Upload
+                        <span class="normal-state">Upload</span>
+                        <span class="processing-state hidden">
+                            <svg
+                                class="animate-spin -ml-1 mr-2 h-4 w-4 inline"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                            >
+                                <circle
+                                    class="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    stroke-width="4"
+                                ></circle>
+                                <path
+                                    class="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                            </svg>
+                            Processing...
+                        </span>
                     </button>
                 </div>
             </form>
@@ -161,6 +183,7 @@
         const progressBar = document.getElementById("progressBar");
         const statusText = document.getElementById("statusText");
         let websocket = null;
+        let isProcessing = false;
 
         async function getWebSocketToken() {
             try {
@@ -202,6 +225,7 @@
             }
         }
 
+        // Modify your connectWebSocket function
         async function connectWebSocket(fileId) {
             try {
                 const isAuthenticated = await checkAuthentication();
@@ -209,7 +233,6 @@
                     return;
                 }
 
-                // Get a WebSocket token
                 const token = await getWebSocketToken();
                 if (!token) {
                     throw new Error("Could not get WebSocket token");
@@ -225,6 +248,7 @@
                 websocket.onopen = () => {
                     console.log("WebSocket connected");
                     statusText.textContent = "Processing PDF...";
+                    updateUploadButtonState(true);
                 };
 
                 websocket.onmessage = (event) => {
@@ -243,8 +267,10 @@
                         if (data.error) {
                             progressBar.style.backgroundColor = "#ef4444";
                             statusText.textContent = `Error: ${data.error}`;
+                            updateUploadButtonState(false);
                         } else if (data.progress === 100) {
                             progressBar.style.backgroundColor = "#22c55e";
+                            updateUploadButtonState(false);
                             if (data.redirect) {
                                 setTimeout(() => {
                                     window.location.href = data.redirect;
@@ -258,6 +284,7 @@
                         );
                         statusText.textContent =
                             "Error processing server response";
+                        updateUploadButtonState(false);
                     }
                 };
 
@@ -265,6 +292,7 @@
                     console.error("WebSocket error:", error);
                     statusText.textContent = "Connection error occurred";
                     progressBar.style.backgroundColor = "#ef4444";
+                    updateUploadButtonState(false);
                 };
 
                 websocket.onclose = (event) => {
@@ -276,16 +304,43 @@
                         statusText.textContent = "Invalid authentication";
                         window.location.href = "/login";
                     }
+                    updateUploadButtonState(false);
                 };
             } catch (error) {
                 console.error("WebSocket connection error:", error);
                 statusText.textContent = "Failed to establish connection";
                 progressBar.style.backgroundColor = "#ef4444";
+                updateUploadButtonState(false);
+            }
+        }
+
+        // Add this function to update button state
+        function updateUploadButtonState(processing) {
+            const button = document.getElementById("uploadButton");
+            const normalState = button.querySelector(".normal-state");
+            const processingState = button.querySelector(".processing-state");
+
+            isProcessing = processing;
+            button.disabled = processing;
+            fileInput.disabled = processing;
+
+            if (processing) {
+                normalState.classList.add("hidden");
+                processingState.classList.remove("hidden");
+            } else {
+                normalState.classList.remove("hidden");
+                processingState.classList.add("hidden");
             }
         }
 
         async function uploadPDF() {
             console.log("Upload initiated");
+
+            // Check if already processing
+            if (isProcessing) {
+                console.log("Upload in progress, ignoring request");
+                return;
+            }
 
             const isAuthenticated = await checkAuthentication();
             if (!isAuthenticated) {
@@ -316,10 +371,11 @@
                 return;
             }
 
-            // Reset progress
+            // Reset progress and update button state
             progressBar.style.width = "0%";
             progressBar.style.backgroundColor = "#2196f3";
             statusText.textContent = "Starting upload...";
+            updateUploadButtonState(true);
 
             const formData = new FormData();
             formData.append("file", file);
@@ -362,7 +418,16 @@
                 statusText.textContent = `Error: ${error.message}`;
                 progressBar.style.width = "100%";
                 progressBar.style.backgroundColor = "#ef4444";
+                updateUploadButtonState(false);
             }
+        }
+
+        // Add this to disable upload when any PDF is processing
+        const processingPdfs = document.querySelectorAll(".text-yellow-600");
+        if (processingPdfs.length > 0) {
+            updateUploadButtonState(true);
+            statusText.textContent =
+                "Please wait for current PDF to finish processing...";
         }
 
         // Check authentication when the page loads

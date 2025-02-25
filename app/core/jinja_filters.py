@@ -1,4 +1,5 @@
 import json
+from jinja2 import pass_context
 
 
 def fromjson(value):
@@ -11,3 +12,11 @@ def fromjson(value):
         return []
     except (TypeError, json.JSONDecodeError):
         return []
+
+
+@pass_context
+def dict_item(context, dict_obj, key, default=None):
+    """Safe dictionary access for Jinja2 templates"""
+    if not dict_obj:
+        return default
+    return dict_obj.get(str(key), default)

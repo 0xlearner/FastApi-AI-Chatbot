@@ -16,3 +16,6 @@ class Vote(Base):
         UniqueConstraint('user_id', 'message_id',
                          name='uix_user_message_vote'),
     )
+
+    class Config:
+        orm_mode = True

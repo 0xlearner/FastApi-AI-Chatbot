@@ -14,7 +14,7 @@ from app.api.endpoints import pdf as pdf_api
 from app.core.config import settings
 # Import database and models first
 from app.core.database import create_tables, drop_tables
-from app.core.jinja_filters import fromjson
+from app.core.jinja_filters import fromjson, dict_item
 from app.core.middleware import auth_middleware, websocket_cors, add_auth_header
 from app.core.websocket_manager import WebSocketManager
 from app.routers import pages as pages_router
@@ -42,6 +42,7 @@ app.mount(
 # Configure templates
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 templates.env.filters["fromjson"] = fromjson
+templates.env.filters["dict_item"] = dict_item
 app.state.templates = templates
 
 # Set up CORS with WebSocket support

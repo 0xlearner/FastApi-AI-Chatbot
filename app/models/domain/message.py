@@ -24,3 +24,6 @@ class Message(Base):
     user = relationship("User", back_populates="messages")
     votes = relationship("Vote", backref="message",
                          cascade="all, delete-orphan")
+
+    class Config:
+        orm_mode = True

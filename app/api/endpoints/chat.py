@@ -9,7 +9,6 @@ from app.core.security import get_current_user
 from app.models.domain.message import Message as MessageModel
 from app.models.domain.user import User
 from app.models.domain.vote import Vote as VoteModel
-from app.schemas.chat import ChatRequest
 from app.services.chat_service import ChatService
 
 logger = get_logger(__name__)
@@ -18,66 +17,98 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/chat/{file_id}", response_model=Dict)
+@router.post("/{file_id}/chat")
 async def chat(
     file_id: str,
-    chat_request: ChatRequest,
+    request: Request,
     current_user=Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service),
     db: Session = Depends(get_db),
 ):
-    # Verify if the user has access to this PDF
+    # Get message from form data
+    form_data = await request.form()
+    message = form_data.get("message")
+
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    # Verify access
     if not await chat_service.verify_pdf_access(file_id, current_user.id, db):
         raise HTTPException(
-            status_code=403, detail="You don't have access to this PDF")
+            status_code=403, detail="Access denied to this PDF")
 
-    response = await chat_service.get_response(
-        query=chat_request.query, file_id=file_id, db=db
+    # Get AI response
+    response = await chat_service.get_response(message, file_id, db)
+
+    # Save both messages
+    await chat_service.save_message_pair(
+        user_id=current_user.id,
+        file_id=file_id,
+        user_message=message,
+        assistant_response=response,
+        db=db
     )
-    return response
+
+    return request.app.state.templates.TemplateResponse(
+        "components/chat-messages.html",
+        {
+            "request": request,
+            "messages": await chat_service.get_chat_history(file_id, current_user.id, db)
+        }
+    )
 
 
 @router.get("/{file_id}/messages")
 async def get_messages(
     file_id: str,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Get chat messages for a specific PDF"""
-    # Get messages
-    messages = (
-        db.query(MessageModel)
-        .filter(
-            MessageModel.file_id == file_id,
-            MessageModel.user_id == current_user.id
+    try:
+        # Get messages
+        messages = (
+            db.query(MessageModel)
+            .filter(
+                MessageModel.file_id == file_id,
+                MessageModel.user_id == current_user.id
+            )
+            .order_by(MessageModel.created_at.asc())
+            .all()
         )
-        .order_by(MessageModel.created_at.asc())
-        .all()
-    )
 
-    # Get user votes for these messages
-    message_ids = [message.id for message in messages]
-    user_votes = (
-        db.query(VoteModel)
-        .filter(
-            VoteModel.user_id == current_user.id,
-            VoteModel.message_id.in_(message_ids)
+        # Get votes
+        user_votes = {}
+        if messages:
+            message_ids = [message.id for message in messages]
+            votes = (
+                db.query(VoteModel)
+                .filter(
+                    VoteModel.user_id == current_user.id,
+                    VoteModel.message_id.in_(message_ids)
+                )
+                .all()
+            )
+            user_votes = {vote.message_id: vote.vote_type for vote in votes}
+
+        return request.app.state.templates.TemplateResponse(
+            "components/chat-messages.html",
+            {
+                "request": request,
+                "messages": messages,
+                "user_votes": user_votes
+            }
         )
-        .all()
-    )
-
-    # Create a dictionary of message_id -> vote_type for easy lookup
-    votes_dict = {vote.message_id: vote.vote_type for vote in user_votes}
-
-    return request.app.state.templates.TemplateResponse(
-        "components/chat-messages.html",
-        {
-            "request": request,
-            "messages": messages,
-            "user_votes": votes_dict  # Pass the votes dictionary to template
-        }
-    )
+    except Exception as e:
+        logger.error(f"Error getting messages: {str(e)}")
+        return request.app.state.templates.TemplateResponse(
+            "components/chat-messages.html",
+            {
+                "request": request,
+                "messages": [],
+                "user_votes": {}
+            }
+        )
 
 
 @router.post("/{file_id}/send")
@@ -123,10 +154,37 @@ async def send_message(
     db.add(bot_message)
     db.commit()
 
-    # Only return the bot's message
+    # Get all messages for this chat
+    all_messages = (
+        db.query(MessageModel)
+        .filter(
+            MessageModel.file_id == file_id,
+            MessageModel.user_id == current_user.id
+        )
+        .order_by(MessageModel.created_at.asc())
+        .all()
+    )
+
+    # Get user votes
+    message_ids = [message.id for message in all_messages]
+    user_votes = (
+        db.query(VoteModel)
+        .filter(
+            VoteModel.user_id == current_user.id,
+            VoteModel.message_id.in_(message_ids)
+        )
+        .all()
+    )
+    votes_dict = {vote.message_id: vote.vote_type for vote in user_votes}
+
+    # Return all messages
     return request.app.state.templates.TemplateResponse(
         "components/chat-messages.html",
-        {"request": request, "messages": [bot_message]}
+        {
+            "request": request,
+            "messages": all_messages,
+            "user_votes": votes_dict
+        }
     )
 
 
@@ -205,3 +263,22 @@ async def vote_message(
         db.rollback()
         logger.error(f"Error processing vote: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{file_id}/history")
+async def get_chat_history(
+    file_id: str,
+    request: Request,
+    current_user=Depends(get_current_user),
+    chat_service: ChatService = Depends(get_chat_service),
+    db: Session = Depends(get_db),
+) -> Dict:
+    # Verify access
+    if not await chat_service.verify_pdf_access(file_id, current_user.id, db):
+        raise HTTPException(
+            status_code=403, detail="Access denied to this PDF")
+
+    # Get chat history
+    messages = await chat_service.get_chat_history(file_id, current_user.id, db)
+
+    return {"messages": messages}
