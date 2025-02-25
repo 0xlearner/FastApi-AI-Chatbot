@@ -1,27 +1,24 @@
 import os
+
 from fastapi import FastAPI, Request, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from app.core.jinja_filters import fromjson
+from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import HTTPException
-from app.core.config import settings
-from app.utils.logging import get_api_logger
-from app.core.websocket_manager import WebSocketManager
-from app.core.middleware import auth_middleware
-
-
-# Import database and models first
-from app.core.database import create_tables, drop_tables
-
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 # Import API routers
 from app.api.endpoints import auth as auth_api
-from app.api.endpoints import pdf as pdf_api
 from app.api.endpoints import chat as chat_api
+from app.api.endpoints import pdf as pdf_api
+from app.core.config import settings
+# Import database and models first
+from app.core.database import create_tables, drop_tables
+from app.core.jinja_filters import fromjson
+from app.core.middleware import auth_middleware, websocket_cors, add_auth_header
+from app.core.websocket_manager import WebSocketManager
 from app.routers import pages as pages_router
-
+from app.utils.logging import get_api_logger
 
 logger = get_api_logger("Main")
 
@@ -57,30 +54,8 @@ app.add_middleware(
     expose_headers=["*"],
 )
 app.middleware("http")(auth_middleware)
-
-
-# WebSocket CORS configuration
-@app.middleware("http")
-async def websocket_cors(request: Request, call_next):
-    if request.headers.get("upgrade", "").lower() == "websocket":
-        return await call_next(request)
-    response = await call_next(request)
-    return response
-
-
-@app.middleware("http")
-async def add_auth_header(request: Request, call_next):
-    # Check for token in cookie
-    token = request.cookies.get("access_token")
-
-    # If token exists in cookie, add it to headers
-    if token and "authorization" not in request.headers:
-        request.headers.__dict__["_list"].append(
-            (b"authorization", f"Bearer {token}".encode())
-        )
-
-    response = await call_next(request)
-    return response
+app.middleware("http")(websocket_cors)
+app.middleware("http")(add_auth_header)
 
 
 # Add WebSocket exception handler
@@ -88,6 +63,13 @@ async def add_auth_header(request: Request, call_next):
 async def websocket_disconnect_handler(request: Request, exc: WebSocketDisconnect):
     logger.info(f"WebSocket disconnected with code: {exc.code}")
     return None
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    raise exc
 
 
 # Include routers
@@ -121,13 +103,6 @@ async def startup_event():
     logger.info("Creating all tables")
     create_tables()
     logger.info("Application startup complete")
-
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    if "application/json" in request.headers.get("accept", ""):
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    raise exc
 
 
 if __name__ == "__main__":

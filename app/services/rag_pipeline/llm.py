@@ -1,12 +1,9 @@
-from typing import List, Dict
-import httpx
 import time
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
+from typing import Dict, List
+
+import httpx
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_exponential)
 
 from app.utils.logging import get_pipeline_logger
 

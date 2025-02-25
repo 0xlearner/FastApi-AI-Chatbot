@@ -1,13 +1,14 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-import json
 
+from app.api.deps import get_chat_service
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.api.deps import get_chat_service
-from app.models.domain.user import User
 from app.models.domain.message import Message as MessageModel
+from app.models.domain.user import User
 from app.services.chat_service import ChatService
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])

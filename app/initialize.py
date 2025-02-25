@@ -1,7 +1,7 @@
 import os
-from app.db.init_db import init_db
-from app.core.config import settings
 
+from app.core.config import settings
+from app.db.init_db import init_db
 from app.utils.logging import get_api_logger
 
 logger = get_api_logger("Initializer")

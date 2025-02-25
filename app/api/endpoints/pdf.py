@@ -1,37 +1,26 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    UploadFile,
-    HTTPException,
-    Request,
-    File,
-    BackgroundTasks,
-    status,
-    WebSocket,
-    WebSocketDisconnect,
-)
+import os
+import uuid
+from datetime import datetime
+from typing import Dict, List
+
+import aiofiles
+from fastapi import (APIRouter, BackgroundTasks, Depends, File, HTTPException,
+                     Request, UploadFile, WebSocket, WebSocketDisconnect,
+                     status)
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from app.core.security import get_current_user
-from app.core.database import get_db
-from app.models.domain import User
-from app.core.logging_config import get_logger
-from typing import List
-import os
-import aiofiles
-from typing import Dict
-from datetime import datetime
-import uuid
-from app.api.deps import get_websocket_manager
-from app.core.security import decode_access_token
-from app.schemas.pdf import PDF as PDFSchema
-from app.models.domain.pdf import PDF as PDFModel
-from app.services.pdf_service import PDFService
-from app.api.deps import get_pdf_service
-from app.core.websocket_manager import WebSocketManager
-from app.repositories.pdf_repository import PDFRepository
-from app.core.config import settings
 
+from app.api.deps import get_pdf_service, get_websocket_manager
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.logging_config import get_logger
+from app.core.security import decode_access_token, get_current_user
+from app.core.websocket_manager import WebSocketManager
+from app.models.domain import User
+from app.models.domain.pdf import PDF as PDFModel
+from app.repositories.pdf_repository import PDFRepository
+from app.schemas.pdf import PDF as PDFSchema
+from app.services.pdf_service import PDFService
 
 logger = get_logger("auth_endpoint")
 

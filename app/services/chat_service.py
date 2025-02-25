@@ -1,11 +1,12 @@
-from app.services.rag_pipeline.embeddings import OllamaEmbeddings
-from app.services.rag_pipeline.vector_store import PineconeStore
-from app.services.rag_pipeline.llm import OllamaLLM
-from app.repositories.pdf_repository import PDFRepository
-from sqlalchemy.orm import Session
-from typing import Dict
 from datetime import datetime
+from typing import Dict
 
+from sqlalchemy.orm import Session
+
+from app.repositories.pdf_repository import PDFRepository
+from app.services.rag_pipeline.embeddings import OllamaEmbeddings
+from app.services.rag_pipeline.llm import OllamaLLM
+from app.services.rag_pipeline.vector_store import PineconeStore
 from app.utils.logging import get_service_logger
 
 logger = get_service_logger("chat_service")

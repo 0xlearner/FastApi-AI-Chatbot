@@ -1,8 +1,9 @@
 from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+
 from app.core.config import settings
-from app.db.session import SessionLocal
 from app.core.service_container import services
+from app.db.session import SessionLocal
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login")

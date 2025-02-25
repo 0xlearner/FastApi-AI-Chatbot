@@ -1,6 +1,7 @@
-from typing import List
-import httpx
 import asyncio
+from typing import List
+
+import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.utils.logging import get_pipeline_logger

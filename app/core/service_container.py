@@ -1,11 +1,11 @@
-from app.services.pdf_service import PDFService
+from app.core.config import settings
+from app.core.websocket_manager import WebSocketManager
 from app.services.chat_service import ChatService
+from app.services.pdf_service import PDFService
 from app.services.rag_pipeline.document_processor import DocumentProcessor
-from app.services.rag_pipeline.vector_store import PineconeStore
 from app.services.rag_pipeline.embeddings import OllamaEmbeddings
 from app.services.rag_pipeline.llm import OllamaLLM
-from app.core.websocket_manager import WebSocketManager
-from app.core.config import settings
+from app.services.rag_pipeline.vector_store import PineconeStore
 
 
 class ServiceContainer:

@@ -1,6 +1,8 @@
-from sqlalchemy.orm import Session
-from app.models.domain.pdf import PDF
 from typing import List
+
+from sqlalchemy.orm import Session
+
+from app.models.domain.pdf import PDF
 
 
 class PDFRepository:

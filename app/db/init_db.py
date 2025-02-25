@@ -1,9 +1,11 @@
-from sqlalchemy.orm import Session
-from app.db.session import engine
-from app.models.domain.user import Base as UserBase
-from app.models.domain.pdf import Base as PDFBase
 import os
+
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
+from app.db.session import engine
+from app.models.domain.pdf import Base as PDFBase
+from app.models.domain.user import Base as UserBase
 
 
 def init_db():

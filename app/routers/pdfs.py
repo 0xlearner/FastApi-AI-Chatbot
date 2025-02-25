@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
+
+from app.core.logging_config import get_logger
 from app.core.security import get_current_user
 from app.models.domain.user import User
-from app.core.logging_config import get_logger
 
 logger = get_logger("pdf_routes")
 router = APIRouter()

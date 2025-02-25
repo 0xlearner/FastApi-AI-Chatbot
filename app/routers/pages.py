@@ -1,16 +1,17 @@
-from fastapi import APIRouter, Depends, Request, HTTPException, Response
-from fastapi.responses import RedirectResponse
-from fastapi.responses import HTMLResponse
-from app.core.security import get_current_user, get_current_user_or_none
-from app.core.config import settings
-from app.models.domain.user import User
 from datetime import datetime
-from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.models.domain.pdf import PDF as PDFModel
-from app.models.domain.message import Message as MessageModel
-from app.repositories.pdf_repository import PDFRepository
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.security import get_current_user, get_current_user_or_none
+from app.models.domain.message import Message as MessageModel
+from app.models.domain.pdf import PDF as PDFModel
+from app.models.domain.user import User
+from app.repositories.pdf_repository import PDFRepository
 
 router = APIRouter()
 

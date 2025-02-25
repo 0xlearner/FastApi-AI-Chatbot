@@ -1,8 +1,9 @@
-from PyPDF2 import PdfReader
-from typing import List, Dict, AsyncGenerator
-import uuid
 import asyncio
 import gc
+import uuid
+from typing import AsyncGenerator, Dict, List
+
+from PyPDF2 import PdfReader
 
 from app.utils.logging import get_pipeline_logger
 

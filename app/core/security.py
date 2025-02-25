@@ -1,14 +1,16 @@
-from functools import lru_cache
+import logging
 from datetime import datetime, timedelta
+from functools import lru_cache
 from typing import Optional
-from fastapi import Depends, HTTPException, status, Request
+
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-import logging
+
 from app.core.config import settings
-from app.core.database import get_db, SessionLocal
+from app.core.database import SessionLocal, get_db
 from app.crud.user import get_user_by_email
 from app.models.domain.user import User
 from app.schemas.user import TokenData

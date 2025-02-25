@@ -1,6 +1,7 @@
-from pinecone import Pinecone
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pinecone import Pinecone
 
 from app.services.rag_pipeline.text_processor import TextProcessor
 from app.utils.logging import get_pipeline_logger

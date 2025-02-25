@@ -1,16 +1,17 @@
-from sqlalchemy.orm import Session
+import asyncio
 import os
 import uuid
-from typing import List, Dict
 from datetime import datetime
+from typing import Dict, List
+
 from fastapi import HTTPException
-from app.models.domain.pdf import PDF
+from sqlalchemy.orm import Session
+
 from app.core.websocket_manager import WebSocketManager
+from app.models.domain.pdf import PDF
 from app.services.rag_pipeline.document_processor import DocumentProcessor
 from app.services.rag_pipeline.embeddings import OllamaEmbeddings
 from app.services.rag_pipeline.vector_store import PineconeStore
-import asyncio
-
 from app.utils.logging import get_service_logger
 
 logger = get_service_logger("pdf_service")

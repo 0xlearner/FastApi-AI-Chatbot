@@ -1,10 +1,11 @@
-from typing import List, Union
+import logging
 import re
-from nltk.tokenize import word_tokenize
+from typing import List, Union
+
+import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-import nltk
-import logging
+from nltk.tokenize import word_tokenize
 
 # Download required NLTK data
 try:

@@ -1,13 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from datetime import datetime, timedelta
+
+from fastapi import (APIRouter, Depends, HTTPException, Request, Response,
+                     status)
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta, datetime
+
 from app.core import security
-from app.core.logging_config import get_logger
 from app.core.database import get_db
+from app.core.logging_config import get_logger
 from app.models.domain.user import User as UserModel
-from app.schemas.user import UserCreate, UserResponse, Token
+from app.schemas.user import Token, UserCreate, UserResponse
 
 logger = get_logger("auth_endpoint")
 router = APIRouter()
@@ -174,10 +177,3 @@ async def logout(response: Response):
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: UserModel = Depends(security.get_current_user)):
     return UserResponse(id=current_user.id, email=current_user.email)
-
-
-@router.get("/debug/users")
-async def debug_users(db: Session = Depends(get_db)):
-    """Debug endpoint to list all users - REMOVE IN PRODUCTION"""
-    users = db.query(UserModel).all()
-    return [{"id": user.id, "email": user.email} for user in users]

@@ -1,16 +1,16 @@
+from typing import Dict, Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from app.core.security import get_current_user
-from app.services.chat_service import ChatService
-from app.api.deps import get_chat_service, get_db
-from app.models.domain.user import User
-from typing import Dict
-from app.schemas.chat import ChatRequest
-from app.models.domain.message import Message as MessageModel
-from app.models.domain.vote import Vote as VoteModel
-from app.core.logging_config import get_logger
 
-from typing import Literal
+from app.api.deps import get_chat_service, get_db
+from app.core.logging_config import get_logger
+from app.core.security import get_current_user
+from app.models.domain.message import Message as MessageModel
+from app.models.domain.user import User
+from app.models.domain.vote import Vote as VoteModel
+from app.schemas.chat import ChatRequest
+from app.services.chat_service import ChatService
 
 logger = get_logger(__name__)
 

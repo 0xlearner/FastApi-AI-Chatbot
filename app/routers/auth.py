@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request, Response, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.templating import Jinja2Templates
-from app.core.logging_config import get_logger
+
 from app.core.config import settings
-from app.models.domain.user import User
+from app.core.logging_config import get_logger
 from app.core.security import get_current_user
+from app.models.domain.user import User
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
