@@ -3,53 +3,82 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>{% block title %}PDF Chat{% endblock %}</title>
-        {% block head %}{% endblock %}
-
-        <!-- Tailwind CSS -->
+        <title>{% block title %}PDF Chatbot{% endblock %}</title>
         <script src="https://cdn.tailwindcss.com"></script>
-
-        <!-- HTMX Core -->
-        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-
-        <!-- HTMX WebSocket Extension -->
-        <script src="https://unpkg.com/htmx.org/dist/ext/ws.js"></script>
-
-        {% block extra_head %}{% endblock %}
+        {% block head %}{% endblock %}
     </head>
-    <body class="bg-gray-100 min-h-screen">
+    <body>
         <!-- Navigation -->
-        <nav class="bg-indigo-600 text-white p-4">
-            <div class="container mx-auto flex justify-between items-center">
-                <a href="/" class="text-xl font-bold">PDF Chat</a>
-                <div class="space-x-4">
-                    {% if user %}
-                    <span>Welcome, {{ user.email }}</span>
-                    <a href="/pdfs" class="hover:text-indigo-200">My PDFs</a>
-                    <a href="/logout" class="hover:text-indigo-200">Logout</a>
-                    {% else %}
-                    <a href="/login" class="hover:text-indigo-200">Login</a>
-                    <a href="/signup" class="hover:text-indigo-200">Sign Up</a>
-                    {% endif %}
+        <nav class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <!-- Left side - Logo -->
+                    <div class="flex">
+                        <div class="flex-shrink-0 flex items-center">
+                            <a
+                                href="/"
+                                class="text-xl font-bold text-indigo-600"
+                                >PDF Chatbot</a
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Right side - Auth Menu -->
+                    <div class="flex items-center">
+                        {% if user %}
+                        <!-- User is logged in -->
+                        <div class="flex items-center space-x-4">
+                            <span class="text-gray-700">{{ user }}</span>
+                            <button
+                                onclick="handleLogout()"
+                                class="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md hover:bg-gray-50"
+                            >
+                                Logout
+                            </button>
+                        </div>
+                        {% else %}
+                        <!-- User is not logged in -->
+                        <div class="flex items-center space-x-4">
+                            <a
+                                href="/login"
+                                class="text-sm text-gray-500 hover:text-gray-700"
+                                >Login</a
+                            >
+                            <a
+                                href="/signup"
+                                class="text-sm text-gray-500 hover:text-gray-700"
+                                >Sign Up</a
+                            >
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </nav>
 
         <!-- Main Content -->
-        <main>{% block content %}{% endblock %}</main>
+        {% block content %}{% endblock %}
 
-        <!-- Base Scripts -->
+        <!-- Logout handling script -->
         <script>
-            // Initialize HTMX WebSocket Extension
-            document.addEventListener("DOMContentLoaded", function () {
-                htmx.defineExtension("ws", {
-                    onEvent: function (name, evt) {
-                        if (name === "htmx:wsConnected") {
-                            console.log("WebSocket Connected");
-                        }
-                    },
-                });
-            });
+            async function handleLogout() {
+                try {
+                    const response = await fetch("/api/v1/auth/logout", {
+                        method: "POST",
+                        credentials: "include",
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Logout failed");
+                    }
+
+                    window.location.href =
+                        "/login?message=Successfully logged out";
+                } catch (error) {
+                    console.error("Logout error:", error);
+                    window.location.href = "/login";
+                }
+            }
         </script>
 
         {% block extra_js %}{% endblock %}

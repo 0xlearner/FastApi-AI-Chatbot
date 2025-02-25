@@ -1,5 +1,5 @@
-{% extends "base.html" %} {% block title %}Upload PDF{% endblock %} {% block
-head %}
+{% extends "base.html" %} {% block title %}My PDFs{% endblock %} {% block head
+%}
 <style>
     .progress-container {
         width: 100%;
@@ -22,33 +22,134 @@ head %}
     }
 </style>
 {% endblock %} {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-2xl font-bold mb-6">Upload PDF</h2>
-
-        <form id="uploadForm" class="space-y-4">
-            <div class="flex flex-col space-y-2">
-                <input
-                    type="file"
-                    id="pdfFile"
-                    name="file"
-                    accept=".pdf"
-                    class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                />
-                <button
-                    type="button"
-                    id="uploadButton"
-                    class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
-                >
-                    Upload
-                </button>
+<div class="min-h-[calc(100vh-4rem)] bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-900">My PDFs</h1>
+                <div class="text-sm text-gray-500 text-right">
+                    <p>{{ current_time }}</p>
+                    <p>{{ user }}</p>
+                </div>
             </div>
-        </form>
-
-        <div class="progress-container mt-6">
-            <div id="progressBar" class="progress-bar"></div>
         </div>
-        <div id="statusText" class="status-text text-gray-700"></div>
+
+        <!-- Upload Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload New PDF</h2>
+            <form id="uploadForm" class="space-y-4">
+                <div class="flex flex-col space-y-2">
+                    <input
+                        type="file"
+                        id="pdfFile"
+                        name="file"
+                        accept=".pdf"
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                    />
+                    <button
+                        type="button"
+                        id="uploadButton"
+                        class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
+                    >
+                        Upload
+                    </button>
+                </div>
+            </form>
+
+            <div class="progress-container mt-6">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div id="statusText" class="status-text text-gray-700"></div>
+        </div>
+
+        <!-- PDFs List -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            {% if pdfs %}
+            <ul class="divide-y divide-gray-200">
+                {% for pdf in pdfs %}
+                <li class="hover:bg-gray-50">
+                    <div class="flex items-center justify-between px-6 py-4">
+                        <div class="flex items-center min-w-0 flex-1">
+                            <div class="min-w-0 flex-1">
+                                <p
+                                    class="truncate text-sm font-medium text-gray-900"
+                                >
+                                    {{ pdf.filename }}
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    Uploaded {{
+                                    pdf.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                                    }} UTC {% if not pdf.is_processed %} •
+                                    <span class="text-yellow-600"
+                                        >Processing...</span
+                                    >
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="ml-4 flex items-center space-x-4">
+                            {% if pdf.is_processed %}
+                            <a
+                                href="/chat/{{ pdf.file_id }}"
+                                class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                                <svg
+                                    class="h-4 w-4 mr-1.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                                    />
+                                </svg>
+                                Chat
+                            </a>
+                            {% else %}
+                            <button
+                                disabled
+                                class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-gray-400 bg-gray-100 cursor-not-allowed"
+                            >
+                                <svg
+                                    class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle
+                                        class="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        stroke-width="4"
+                                    ></circle>
+                                    <path
+                                        class="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                </svg>
+                                Processing
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="p-8 text-center">
+                <p class="text-sm text-gray-500">
+                    No PDFs uploaded yet. Upload your first PDF to start
+                    chatting!
+                </p>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %} {% block extra_js %}

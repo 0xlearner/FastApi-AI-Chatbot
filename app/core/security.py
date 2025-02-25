@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 import logging
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.crud.user import get_user_by_email
 from app.models.domain.user import User
 from app.schemas.user import TokenData
@@ -42,6 +42,21 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
+async def get_current_user_or_none(
+    request: Request,
+) -> Optional[User]:
+    """Get current user if authenticated, otherwise return None"""
+    try:
+        # Create a new database session
+        db_session = SessionLocal()
+        try:
+            return await get_current_user(request, db_session)
+        finally:
+            db_session.close()
+    except HTTPException:
+        return None
+
+
 async def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
@@ -55,12 +70,13 @@ async def get_current_user(
     try:
         # Get token from cookie
         token = request.cookies.get("access_token")
-        logger.debug(
-            f"Token from cookie: {
-                     token[:10]}..."
-            if token
-            else "No token"
-        )
+
+        # Remove 'Bearer ' prefix if it exists in the cookie
+        if token and token.startswith("Bearer "):
+            token = token.replace("Bearer ", "")
+
+        logger.debug(f"Token from cookie: {
+                     token[:10]}..." if token else "No token")
 
         if not token:
             # Try authorization header as fallback
@@ -81,16 +97,22 @@ async def get_current_user(
             if email is None:
                 logger.error("No email in token payload")
                 raise credentials_exception
+
+            logger.debug(f"Decoded token payload: {payload}")
         except JWTError as e:
             logger.error(f"JWT decode error: {str(e)}")
             raise credentials_exception
 
-        user = get_user_by_email(db, email=email)
-        if user is None:
-            logger.error(f"User not found: {email}")
-            raise credentials_exception
-
-        return user
+        # Create a new database session
+        db_session = SessionLocal()
+        try:
+            user = get_user_by_email(db_session, email=email)
+            if user is None:
+                logger.error(f"User not found: {email}")
+                raise credentials_exception
+            return user
+        finally:
+            db_session.close()
 
     except Exception as e:
         logger.error(f"Authentication error: {str(e)}")
@@ -118,10 +140,12 @@ def extract_token_from_request(request: Request) -> Optional[str]:
 
 @lru_cache(maxsize=1024)
 def get_cached_user_validation(token: str) -> TokenData:
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    payload = jwt.decode(token, settings.SECRET_KEY,
+                         algorithms=[settings.ALGORITHM])
     username: str = payload.get("sub")
     if username is None:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
+        raise HTTPException(
+            status_code=401, detail="Could not validate credentials")
     return TokenData(username=username)
 
 

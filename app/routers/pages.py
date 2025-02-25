@@ -1,58 +1,101 @@
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException, Response
+from fastapi.responses import RedirectResponse
 from fastapi.responses import HTMLResponse
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_current_user_or_none
+from app.core.config import settings
 from app.models.domain.user import User
-from app.services.pdf_service import PDFService
-from app.api.deps import get_pdf_service
+from datetime import datetime
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from fastapi.templating import Jinja2Templates
 from app.models.domain.pdf import PDF as PDFModel
 from app.models.domain.message import Message as MessageModel
-import os
+from app.repositories.pdf_repository import PDFRepository
+from typing import Optional
 
 router = APIRouter()
 
-# Get the base directory path
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-
 
 @router.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request})
-
-
-@router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
-
-@router.get("/signup", response_class=HTMLResponse)
-async def signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request})
+async def home(
+    request: Request,
+    current_user: Optional[User] = Depends(get_current_user_or_none)
+):
+    return request.app.state.templates.TemplateResponse(
+        "home.html",
+        {
+            "request": request,
+            "user": current_user,
+            "current_time": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        }
+    )
 
 
 @router.get("/pdfs")
 async def pdfs_page(
     request: Request,
-    file: str = None,
     current_user: User = Depends(get_current_user),
-    pdf_service: PDFService = Depends(get_pdf_service),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db)
 ):
-    context = {
-        "request": request,
-        "user": current_user,
-    }
+    try:
+        pdf_repository = PDFRepository()
+        user_pdfs = await pdf_repository.get_user_pdfs(current_user.id, db)
+        return request.app.state.templates.TemplateResponse(
+            "pdfs.html",
+            {
+                "request": request,
+                "user": current_user,
+                "pdfs": user_pdfs,
+                "current_time": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        )
+    except HTTPException as e:
+        # If authentication fails, redirect to login
+        return RedirectResponse(url="/login", status_code=302)
 
-    if file:
-        pdf = pdf_service.get_pdf_by_filename(file, current_user.id, db)
-        if pdf:
-            context["uploaded_file"] = {
-                "filename": file, "file_id": pdf.file_id}
 
-    return templates.TemplateResponse("pdfs.html", context)
+@router.get("/login")
+async def login_page(
+    request: Request,
+    current_user: Optional[User] = Depends(get_current_user_or_none)
+):
+    # If user is already logged in, redirect to PDFs page
+    if current_user:
+        return RedirectResponse(url="/pdfs", status_code=302)
+
+    return request.app.state.templates.TemplateResponse(
+        "login.html",
+        {"request": request, "user": None}
+    )
+
+
+@router.get("/signup")
+async def signup_page(
+    request: Request,
+    current_user: Optional[User] = Depends(get_current_user_or_none)
+):
+    # If user is already logged in, redirect to PDFs page
+    if current_user:
+        return RedirectResponse(url="/pdfs", status_code=302)
+
+    return request.app.state.templates.TemplateResponse(
+        "signup.html",
+        {"request": request, "user": None}
+    )
+
+
+@router.get("/logout")
+async def logout_page(request: Request, response: Response):
+    """Handle logout and redirect to login page"""
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite='lax'
+    )
+    return RedirectResponse(
+        url="/login?message=Successfully logged out",
+        status_code=302
+    )
 
 
 @router.get("/chat/{file_id}")

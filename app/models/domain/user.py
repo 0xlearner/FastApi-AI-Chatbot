@@ -15,3 +15,6 @@ class User(Base):
     # Use string references for relationships to avoid circular imports
     pdfs = relationship("PDF", back_populates="user")
     messages = relationship("Message", back_populates="user")
+
+    def __str__(self):
+        return f"Current User's Login: {self.email}"

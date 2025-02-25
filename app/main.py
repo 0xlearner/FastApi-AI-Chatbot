@@ -9,6 +9,7 @@ from fastapi.exceptions import HTTPException
 from app.core.config import settings
 from app.utils.logging import get_api_logger
 from app.core.websocket_manager import WebSocketManager
+from app.core.middleware import auth_middleware
 
 
 # Import database and models first
@@ -55,6 +56,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+app.middleware("http")(auth_middleware)
 
 
 # WebSocket CORS configuration

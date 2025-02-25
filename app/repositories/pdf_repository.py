@@ -7,7 +7,7 @@ class PDFRepository:
     @staticmethod
     async def get_user_pdfs(user_id: int, db: Session) -> List[PDF]:
         """Get all PDFs belonging to a user"""
-        return db.query(PDF).filter(PDF.user_id == user_id).all()
+        return db.query(PDF).filter(PDF.user_id == user_id).order_by(PDF.created_at.desc()).all()
 
     @staticmethod
     async def get_pdf_by_id(file_id: str, db: Session) -> PDF:
