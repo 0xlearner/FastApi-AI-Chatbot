@@ -19,3 +19,5 @@ class Message(Base):
 
     # Use string references for relationships
     user = relationship("User", back_populates="messages")
+    votes = relationship("Vote", backref="message",
+                         cascade="all, delete-orphan")

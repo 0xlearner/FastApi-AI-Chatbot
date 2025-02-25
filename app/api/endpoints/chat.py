@@ -7,8 +7,12 @@ from app.models.domain.user import User
 from typing import Dict
 from app.schemas.chat import ChatRequest
 from app.models.domain.message import Message as MessageModel
+from app.models.domain.vote import Vote as VoteModel
+from app.core.logging_config import get_logger
 
 from typing import Literal
+
+logger = get_logger(__name__)
 
 
 router = APIRouter()
@@ -41,6 +45,7 @@ async def get_messages(
     db: Session = Depends(get_db),
 ):
     """Get chat messages for a specific PDF"""
+    # Get messages
     messages = (
         db.query(MessageModel)
         .filter(
@@ -51,9 +56,27 @@ async def get_messages(
         .all()
     )
 
+    # Get user votes for these messages
+    message_ids = [message.id for message in messages]
+    user_votes = (
+        db.query(VoteModel)
+        .filter(
+            VoteModel.user_id == current_user.id,
+            VoteModel.message_id.in_(message_ids)
+        )
+        .all()
+    )
+
+    # Create a dictionary of message_id -> vote_type for easy lookup
+    votes_dict = {vote.message_id: vote.vote_type for vote in user_votes}
+
     return request.app.state.templates.TemplateResponse(
         "components/chat-messages.html",
-        {"request": request, "messages": messages}
+        {
+            "request": request,
+            "messages": messages,
+            "user_votes": votes_dict  # Pass the votes dictionary to template
+        }
     )
 
 
@@ -126,12 +149,59 @@ async def vote_message(
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    # Update vote count
-    if vote_type == "upvote":
-        message.upvotes += 1
-    else:
-        message.downvotes += 1
+    try:
+        # Check if user has already voted
+        existing_vote = db.query(VoteModel).filter(
+            VoteModel.user_id == current_user.id,
+            VoteModel.message_id == message_id
+        ).first()
 
-    db.commit()
+        if existing_vote:
+            if existing_vote.vote_type == vote_type:
+                # Remove vote if clicking the same type again
+                if vote_type == "upvote":
+                    message.upvotes = max(0, message.upvotes - 1)
+                else:
+                    message.downvotes = max(0, message.downvotes - 1)
+                db.delete(existing_vote)
+                db.commit()
+                return {
+                    "success": True,
+                    "upvotes": message.upvotes,
+                    "downvotes": message.downvotes,
+                    "userVote": None  # No active vote
+                }
+            else:
+                # Change vote type
+                if vote_type == "upvote":
+                    message.upvotes += 1
+                    message.downvotes = max(0, message.downvotes - 1)
+                else:
+                    message.downvotes += 1
+                    message.upvotes = max(0, message.upvotes - 1)
+                existing_vote.vote_type = vote_type
+        else:
+            # Create new vote
+            new_vote = VoteModel(
+                user_id=current_user.id,
+                message_id=message_id,
+                vote_type=vote_type
+            )
+            db.add(new_vote)
+            if vote_type == "upvote":
+                message.upvotes += 1
+            else:
+                message.downvotes += 1
 
-    return {"success": True, "upvotes": message.upvotes, "downvotes": message.downvotes}
+        db.commit()
+        return {
+            "success": True,
+            "upvotes": message.upvotes,
+            "downvotes": message.downvotes,
+            "userVote": vote_type
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error processing vote: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

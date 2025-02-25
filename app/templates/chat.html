@@ -49,69 +49,107 @@ block content %}
 </div>
 
 <style>
+
+    .vote-button {
+            transition: all 0.2s ease-in-out;
+            position: relative;
+        }
+
     .vote-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        opacity: 0.5;
+        cursor: not-allowed !important;
+        pointer-events: none;
+        background-color: rgba(0, 0, 0, 0.05);
+    }
 
-        .vote-button.text-indigo-600 {
-            @apply bg-indigo-50;
-        }
+    .vote-button:not(:disabled):hover {
+        transform: scale(1.1);
+    }
 
-        .vote-button:hover:not(:disabled) svg {
-            @apply transform scale-110;
-        }
+    .vote-button.text-indigo-600 {
+        background-color: rgba(99, 102, 241, 0.1);
+    }
 
-        .vote-count {
-            min-width: 1rem;
-            text-align: center;
+    .vote-count {
+        min-width: 1rem;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        user-select: none;
+    }
 
-        .message-in {
+    .vote-button.loading {
+        position: relative;
+        pointer-events: none;
+    }
+
+    .vote-button.loading svg {
+        opacity: 0;
+    }
+
+    .vote-button.loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 12px;
+        height: 12px;
+        margin: -6px 0 0 -6px;
+        border: 2px solid rgba(99, 102, 241, 0.3);
+        border-top-color: rgba(99, 102, 241, 1);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .vote-count {
+        min-width: 1rem;
+        text-align: center;
+
+    .message-in {
+        opacity: 0;
+        animation: fadeIn 0.3s ease-in forwards;
+    }
+
+    @keyframes fadeIn {
+        from {
             opacity: 0;
-            animation: fadeIn 0.3s ease-in forwards;
+            transform: translateY(10px);
         }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
 
-        .typing-indicator {
-            display: flex;
-            align-items: center;
-            gap: 2px;
-        }
+    .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background: #6366f1;
+        border-radius: 50%;
+        animation: bounce 1.5s infinite;
+    }
 
-        .typing-indicator span {
-            width: 8px;
-            height: 8px;
-            background: #6366f1;
-            border-radius: 50%;
-            animation: bounce 1.5s infinite;
-        }
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
 
-        .typing-indicator span:nth-child(2) {
-            animation-delay: 0.2s;
+    @keyframes bounce {
+        0%,
+        100% {
+            transform: translateY(0);
         }
-        .typing-indicator span:nth-child(3) {
-            animation-delay: 0.4s;
+        50% {
+            transform: translateY(-4px);
         }
-
-        @keyframes bounce {
-            0%,
-            100% {
-                transform: translateY(0);
-            }
-            50% {
-                transform: translateY(-4px);
-            }
-        }
+    }
 </style>
 
 <script>
@@ -240,13 +278,32 @@ block content %}
         }
     }
 
-    async function handleVote(button, messageId, voteType) {
+    async function handleVoteClick(button) {
         try {
-            // Disable button to prevent double-clicks
-            const buttons = button
-                .closest(".flex")
-                .querySelectorAll(".vote-button");
-            buttons.forEach((btn) => (btn.disabled = true));
+            const messageId = button.dataset.messageId;
+            const voteType = button.dataset.voteType;
+
+            // Get the message wrapper div
+            const messageWrapper = button.closest(".message-wrapper");
+            if (!messageWrapper) {
+                console.error("Message wrapper not found");
+                return;
+            }
+
+            // Get both buttons from the same message wrapper
+            const upvoteBtn = messageWrapper.querySelector(
+                '.vote-button[data-vote-type="upvote"]',
+            );
+            const downvoteBtn = messageWrapper.querySelector(
+                '.vote-button[data-vote-type="downvote"]',
+            );
+
+            // Add loading state to clicked button
+            button.classList.add("loading");
+
+            // Disable buttons during request
+            if (upvoteBtn) upvoteBtn.setAttribute("disabled", "disabled");
+            if (downvoteBtn) downvoteBtn.setAttribute("disabled", "disabled");
 
             const response = await fetch(
                 `/api/v1/chat/{{ pdf.file_id }}/messages/${messageId}/vote?vote_type=${voteType}`,
@@ -259,28 +316,87 @@ block content %}
             );
 
             if (!response.ok) {
-                throw new Error("Network response was not ok");
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
 
             // Update vote counts
-            const container = button.closest(".flex");
-            container.querySelector(".vote-count").textContent =
-                voteType === "upvote" ? data.upvotes : data.downvotes;
+            const upvoteCount = messageWrapper.querySelector(
+                '.vote-count[data-vote-type="upvote"]',
+            );
+            const downvoteCount = messageWrapper.querySelector(
+                '.vote-count[data-vote-type="downvote"]',
+            );
 
-            // Visual feedback
-            button.classList.add("text-indigo-600");
+            if (upvoteCount) upvoteCount.textContent = data.upvotes || "0";
+            if (downvoteCount)
+                downvoteCount.textContent = data.downvotes || "0";
+
+            // Reset all button states
+            if (upvoteBtn) {
+                upvoteBtn.classList.remove("text-indigo-600", "bg-indigo-50");
+                upvoteBtn.removeAttribute("disabled");
+            }
+            if (downvoteBtn) {
+                downvoteBtn.classList.remove("text-indigo-600", "bg-indigo-50");
+                downvoteBtn.removeAttribute("disabled");
+            }
+
+            // Apply new states based on response
+            if (data.userVote === "upvote") {
+                upvoteBtn?.classList.add("text-indigo-600", "bg-indigo-50");
+                downvoteBtn?.setAttribute("disabled", "disabled");
+            } else if (data.userVote === "downvote") {
+                downvoteBtn?.classList.add("text-indigo-600", "bg-indigo-50");
+                upvoteBtn?.setAttribute("disabled", "disabled");
+            }
         } catch (error) {
-            console.error("Error:", error);
+            console.error("Vote error:", error);
             showToast("Failed to record vote", "error");
         } finally {
-            // Re-enable buttons
-            const buttons = button
-                .closest(".flex")
-                .querySelectorAll(".vote-button");
-            buttons.forEach((btn) => (btn.disabled = false));
+            // Remove loading state
+            button.classList.remove("loading");
         }
+    }
+
+    // Add these styles to your existing styles
+    const voteStyles = `
+        .vote-button {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .vote-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .vote-button:not(:disabled):hover {
+            transform: scale(1.1);
+        }
+
+        .vote-button.text-indigo-600 {
+            background-color: rgba(99, 102, 241, 0.1);
+        }
+
+        .vote-count {
+            min-width: 1rem;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .vote-button:disabled svg {
+            opacity: 0.5;
+        }
+    `;
+
+    // Add styles to the document if not already added
+    if (!document.querySelector("#vote-styles")) {
+        const styleSheet = document.createElement("style");
+        styleSheet.id = "vote-styles";
+        styleSheet.textContent = voteStyles;
+        document.head.appendChild(styleSheet);
     }
 
     function showToast(message, type = "error") {
