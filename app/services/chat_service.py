@@ -1,10 +1,9 @@
 from app.services.rag_pipeline.embeddings import OllamaEmbeddings
 from app.services.rag_pipeline.vector_store import PineconeStore
 from app.services.rag_pipeline.llm import OllamaLLM
-from app.services.pdf_service import PDFService
+from app.repositories.pdf_repository import PDFRepository
 from sqlalchemy.orm import Session
-from typing import Dict, Optional
-import logging
+from typing import Dict
 from datetime import datetime
 
 from app.utils.logging import get_service_logger
@@ -18,24 +17,24 @@ class ChatService:
         embeddings: OllamaEmbeddings,
         vector_store: PineconeStore,
         llm: OllamaLLM,
-        pdf_service: PDFService,
     ):
         self.embeddings = embeddings
         self.vector_store = vector_store
         self.llm = llm
-        self.pdf_service = pdf_service
+        self.pdf_repository = PDFRepository()
         logger.info(f"[{datetime.utcnow()}] ChatService initialized")
 
     async def verify_pdf_access(self, file_id: str, user_id: int, db: Session) -> bool:
         """Verify if a user has access to a specific PDF"""
-        return await self.pdf_service.verify_pdf_access(file_id, user_id, db)
+        return await self.pdf_repository.verify_pdf_access(file_id, user_id, db)
 
     async def get_response(self, query: str, file_id: str, db: Session) -> Dict:
         """Get a response for a query about a specific PDF"""
         try:
             start_time = datetime.utcnow()
             logger.info(
-                f"[{start_time}] Processing query: '{query}' for file_id: {file_id}"
+                f"[{start_time}] Processing query: '{
+                    query}' for file_id: {file_id}"
             )
 
             # Generate query embedding
@@ -52,7 +51,8 @@ class ChatService:
 
             if not results:
                 logger.warning(
-                    f"No relevant context found for query '{query}' in file {file_id}"
+                    f"No relevant context found for query '{
+                        query}' in file {file_id}"
                 )
                 return {
                     "response": "I couldn't find any relevant information in the document to answer your question. "
@@ -77,7 +77,8 @@ class ChatService:
             end_time = datetime.utcnow()
             logger.info(
                 f"[{end_time}] Completed response generation. "
-                f"Processing time: {(end_time - start_time).total_seconds():.2f}s"
+                f"Processing time: {
+                    (end_time - start_time).total_seconds():.2f}s"
             )
 
             return {"response": response, "sources": sources}

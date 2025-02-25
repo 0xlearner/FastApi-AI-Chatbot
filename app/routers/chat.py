@@ -38,7 +38,8 @@ async def get_messages(
 
     # Render messages template
     return templates.TemplateResponse(
-        "components/chat-messages.html", {"request": request, "messages": messages}
+        "components/chat-messages.html", {
+            "request": request, "messages": messages}
     )
 
 

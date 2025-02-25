@@ -1,14 +1,13 @@
-import json
 import os
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from app.core.jinja_filters import fromjson
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 from app.core.config import settings
 from app.utils.logging import get_api_logger
-from app.core.security import decode_access_token
 from app.core.websocket_manager import WebSocketManager
 
 
@@ -44,7 +43,7 @@ app.mount(
 
 # Configure templates
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-templates.env.filters["fromjson"] = lambda x: json.loads(x) if x else {}
+templates.env.filters["fromjson"] = fromjson
 app.state.templates = templates
 
 # Set up CORS with WebSocket support

@@ -10,6 +10,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.security import get_current_user
 from app.core.database import get_db
@@ -24,6 +25,7 @@ import uuid
 from app.api.deps import get_websocket_manager
 from app.core.security import decode_access_token
 from app.schemas.pdf import PDF as PDFSchema
+from app.models.domain.pdf import PDF as PDFModel
 from app.services.pdf_service import PDFService
 from app.api.deps import get_pdf_service
 from app.core.websocket_manager import WebSocketManager
@@ -165,6 +167,44 @@ async def list_pdfs(
             status_code=500,
             detail=str(e)
         )
+
+
+@router.get("/view/{file_id}")
+async def view_pdf(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Stream PDF file for viewing"""
+    # Check if PDF exists and user has access
+    pdf = db.query(PDFModel).filter(
+        PDFModel.file_id == file_id,
+        PDFModel.user_id == current_user.id
+    ).first()
+
+    if not pdf:
+        raise HTTPException(
+            status_code=404,
+            detail="PDF not found or you don't have access to it"
+        )
+
+    # Check if file exists
+    if not os.path.exists(pdf.file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="PDF file not found on server"
+        )
+
+    # Return the PDF file
+    return FileResponse(
+        pdf.file_path,
+        media_type="application/pdf",
+        filename=pdf.filename,
+        headers={
+            "Content-Disposition": f"inline; filename={pdf.filename}",
+            "Cache-Control": "no-cache"
+        }
+    )
 
 
 async def save_upload_file(upload_file: UploadFile, user_id: int, file_id: str) -> tuple[str, bytes]:

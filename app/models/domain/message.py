@@ -11,10 +11,11 @@ class Message(Base):
     content = Column(Text, nullable=False)
     role = Column(String(50), nullable=False)  # 'user' or 'assistant'
     sources = Column(JSON, nullable=True)  # For storing source references
+    upvotes = Column(Integer, default=0)
+    downvotes = Column(Integer, default=0)
     file_id = Column(String(255), ForeignKey("pdfs.file_id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Use string references for relationships
     user = relationship("User", back_populates="messages")
-    # pdf = relationship("PDF", back_populates="messages")

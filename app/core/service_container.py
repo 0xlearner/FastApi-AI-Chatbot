@@ -92,7 +92,6 @@ class ServiceContainer:
                 embeddings=self.embeddings,
                 vector_store=self.vector_store,
                 llm=self.llm,
-                pdf_service=self.pdf_service,
             )
 
 

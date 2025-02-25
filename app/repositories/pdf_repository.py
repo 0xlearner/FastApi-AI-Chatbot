@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.domain.pdf import PDF
 from typing import List
 
+
 class PDFRepository:
     @staticmethod
     async def get_user_pdfs(user_id: int, db: Session) -> List[PDF]:
@@ -17,3 +18,13 @@ class PDFRepository:
     def get_pdf_by_filename(filename: str, user_id: int, db: Session) -> PDF:
         """Get PDF by filename and user_id"""
         return db.query(PDF).filter(PDF.filename == filename, PDF.user_id == user_id).first()
+
+    @staticmethod
+    async def verify_pdf_access(self, file_id: str, user_id: int, db: Session) -> bool:
+        """Verify if user has access to the PDF"""
+        pdf = db.query(PDF).filter(
+            PDF.file_id == file_id,
+            PDF.user_id == user_id,
+            PDF.is_processed == True
+        ).first()
+        return pdf is not None

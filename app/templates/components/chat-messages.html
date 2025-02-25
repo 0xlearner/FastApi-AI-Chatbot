@@ -1,0 +1,97 @@
+{% from 'components/macros.html' import chat_message %} {% for message in
+messages %}
+<div
+    class="flex justify-{{ 'end' if message.role == 'user' else 'start' }} message-in"
+>
+    <div
+        class="max-w-[70%] {{ 'bg-indigo-600 text-white' if message.role == 'user' else 'bg-white' }} rounded-lg px-4 py-2 shadow"
+    >
+        <!-- Message Header with Timestamp -->
+        <div class="flex justify-between items-center mb-1">
+            <span
+                class="text-xs {{ 'text-gray-200' if message.role == 'user' else 'text-gray-500' }}"
+            >
+                {{ message.role|title }} • {{
+                message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+            </span>
+        </div>
+
+        <!-- Message Content -->
+        <p class="text-sm">{{ message.content }}</p>
+
+        <!-- Sources and Voting (only for assistant messages) -->
+        {% if message.role == 'assistant' %} {% if message.sources %} {% set
+        sources = message.sources|fromjson %}
+        <div class="mt-2 text-xs text-gray-500">
+            <p class="font-semibold">Source:</p>
+            {% for source in sources %}
+            <div class="mt-1">
+                <div class="flex items-center gap-2">
+                    <span class="font-medium"
+                        >Page {{ source.page_number|int }}</span
+                    >
+                    {% if source.score %}
+                    <span class="text-xs text-gray-400"
+                        >(Relevance: {{ "%.2f"|format(source.score) }})</span
+                    >
+                    {% endif %}
+                </div>
+                <p class="italic mt-1">{{ source.text_preview }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Voting buttons -->
+        <div class="mt-2 flex items-center gap-4 text-sm text-gray-500">
+            <div class="flex items-center gap-1">
+                <button
+                    onclick="handleVote(this, '{{ message.id }}', 'upvote')"
+                    class="vote-button p-1 rounded hover:bg-gray-100 transition-colors"
+                    title="Helpful"
+                    data-message-id="{{ message.id }}"
+                >
+                    <svg
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+                        ></path>
+                    </svg>
+                </button>
+                <span class="vote-count">{{ message.upvotes or 0 }}</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <button
+                    onclick="handleVote(this, '{{ message.id }}', 'downvote')"
+                    class="vote-button p-1 rounded hover:bg-gray-100 transition-colors"
+                    title="Not helpful"
+                    data-message-id="{{ message.id }}"
+                >
+                    <svg
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5 6h2a2 2 0 002-2v-6a2 2 0 00-2-2h-2.5"
+                        ></path>
+                    </svg>
+                </button>
+                <span class="vote-count">{{ message.downvotes or 0 }}</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
