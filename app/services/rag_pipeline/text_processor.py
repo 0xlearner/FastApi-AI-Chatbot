@@ -1,19 +1,9 @@
-import logging
 import re
 from typing import List, Union
 
-import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-
-# Download required NLTK data
-try:
-    nltk.download("punkt", quiet=True)
-    nltk.download("stopwords", quiet=True)
-    nltk.download("wordnet", quiet=True)
-except Exception as e:
-    logging.warning(f"Failed to download NLTK data: {str(e)}")
 
 from app.utils.logging import get_pipeline_logger
 
@@ -22,6 +12,7 @@ logger = get_pipeline_logger("text_processor")
 
 class TextProcessor:
     def __init__(self):
+        # self._initialize_nltk()
         self.lemmatizer = WordNetLemmatizer()
         self.stop_words = set(stopwords.words("english"))
         logger.info("TextProcessor initialized with NLTK resources")

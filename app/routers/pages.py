@@ -10,8 +10,8 @@ from app.core.database import get_db
 from app.core.security import get_current_user, get_current_user_or_none
 from app.models.domain.message import Message as MessageModel
 from app.models.domain.pdf import PDF as PDFModel
-from app.models.domain.vote import Vote as VoteModel
 from app.models.domain.user import User
+from app.models.domain.vote import Vote as VoteModel
 from app.repositories.pdf_repository import PDFRepository
 
 router = APIRouter()

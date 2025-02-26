@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+*.db
+.git
+.gitignore
+.docker
+node_modules/
+static/uploads/*
+!static/uploads/.gitkeep

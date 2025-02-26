@@ -1,0 +1,31 @@
+services:
+  chatbot:
+    build: .
+    ports:
+      - "8000:8000"
+      - "11434:11434"
+    volumes:
+      - .:/app
+      - ollama_data:/root/.ollama
+    environment:
+      - DATABASE_URL=sqlite:///./app.db
+      - OLLAMA_HOST=localhost:11434
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: "8g"
+    healthcheck:
+      test: |
+        CMD-SHELL curl -f http://localhost:8000/docs > /dev/null &&
+        curl -f http://localhost:11434/api/tags > /dev/null || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
