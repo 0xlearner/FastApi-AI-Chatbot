@@ -83,7 +83,7 @@ class ServiceContainer:
                 embeddings=self.embeddings,
                 vector_store=self.vector_store,
                 upload_dir=settings.UPLOAD_DIR,
-                websocket_manager=self.websocket_manager,  # Add this
+                websocket_manager=self.websocket_manager,
             )
 
         # Initialize chat service last

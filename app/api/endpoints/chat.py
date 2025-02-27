@@ -37,7 +37,7 @@ async def chat(
         raise HTTPException(
             status_code=403, detail="Access denied to this PDF")
 
-    # Get AI response
+    # Get model response
     response = await chat_service.get_response(message, file_id, db)
 
     # Save both messages
@@ -136,7 +136,7 @@ async def send_message(
     db.add(user_message)
     db.commit()
 
-    # Get chatbot response
+    # Get model response
     response = await chat_service.get_response(
         query=message_text,
         file_id=file_id,

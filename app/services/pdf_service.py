@@ -59,7 +59,6 @@ class PDFService:
                 await self.vector_store.upsert_documents(embeddings, chunk_batch)
 
                 # Calculate and send progress
-                # Note: We don't increment processed_chunks here anymore
                 current_progress = base_progress + \
                     int((processed_chunks / total_chunks) * remaining_progress)
                 await self.websocket_manager.send_progress(

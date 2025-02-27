@@ -203,7 +203,7 @@ api-logs:
 api-err-logs:
 	@echo "\n$(GREEN)FastAPI Error Logs:$(NC)"
 	@container_id=$$(docker ps -qf "name=pdf-chatbot-api-chatbot"); \
-	@docker exec $$container_id cat /var/log/supervisor/fastapi.err.log
+	docker exec $$container_id cat /var/log/supervisor/fastapi.err.log
 
 # Helper target to show container ID
 id:

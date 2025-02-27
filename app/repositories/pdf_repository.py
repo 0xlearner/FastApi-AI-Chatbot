@@ -29,4 +29,4 @@ class PDFRepository:
             PDF.user_id == user_id,
             PDF.is_processed == True
         ).first()
-        return pdf is not None
+        return pdf
