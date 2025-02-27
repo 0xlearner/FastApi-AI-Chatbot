@@ -75,6 +75,95 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+## 🛠️ Make Commands
+
+The project includes a comprehensive Makefile for easy management. Here are the available commands:
+
+### Basic Commands
+
+```bash
+# Build the container
+make build
+
+# Start the container and services
+make up
+
+# Stop the container
+make down
+
+# Restart the container
+make restart
+
+# Remove container and volumes (clean slate)
+make clean
+```
+
+### Monitoring & Debugging
+
+```bash
+# Check status of all services
+make status
+
+# View container logs
+make logs
+
+# View API logs specifically
+make api-logs
+
+# View API error logs
+make api-err-logs
+
+# Check all log files
+make check-logs
+
+# Start in debug mode
+make debug
+
+# Monitor model download progress
+make download-progress
+```
+
+### Advanced Commands
+
+```bash
+# Access container shell
+make shell
+
+# Manually pull AI models
+make models
+```
+
+### Quick Start
+
+For the easiest setup, just run these two commands:
+
+```bash
+make build
+make up
+```
+
+The `make up` command will:
+1. Start the container
+2. Wait for Ollama to initialize
+3. Download required models (llama3.2:3b and nomic-embed-text)
+4. Start the FastAPI server
+5. Verify all services are running properly
+
+You can monitor the status at any time with:
+```bash
+make status
+```
+
+### Service Health Indicators
+
+The status command shows:
+- 🟢 Container status
+- 🟢 Model download status
+- 🟢 FastAPI service status
+- 🟢 Ollama service status
+
+If you encounter any issues, use `make logs` or `make debug` for troubleshooting.
+
 ## 🔌 API Endpoints
 
 - **Health Check**: `/health`
