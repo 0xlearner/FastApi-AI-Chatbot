@@ -29,6 +29,7 @@ While many libraries offer quick solutions for building LLM applications, they o
 - **Models**:
   - llama3.2:3b (for text generation)
   - nomic-embed-text (for embeddings)
+- **Vector Database**: Pinecone
 - **Database**: SQLite (easily adaptable to other databases)
 - **Frontend**: HTML/JavaScript/HTMX with WebSocket support
 - **Containerization**: Docker
@@ -38,6 +39,7 @@ While many libraries offer quick solutions for building LLM applications, they o
 - Docker
 - Docker Compose (optional, but recommended)
 - 8GB+ RAM (for running the LLM models)
+- Pinecone API key
 
 ## 🔧 Installation & Setup
 
