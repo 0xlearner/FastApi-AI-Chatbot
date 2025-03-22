@@ -200,7 +200,3 @@ Update the Ollama configuration to:
 - Use different models
 - Adjust model parameters
 - Implement model switching logic
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
